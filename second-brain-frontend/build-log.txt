@@ -1,0 +1,3 @@
+﻿src/features/notes/components/NoteEditorPage.tsx(3,26): error TS2307: Cannot find module '../components/notes/NoteTree' or its corresponding type declarations.
+src/features/notes/components/NoteEditorPage.tsx(4,28): error TS2307: Cannot find module '../components/notes/NoteEditor' or its corresponding type declarations.
+src/shared/layout/CommandPalette.tsx(2,30): error TS2307: Cannot find module '@/shared/layout/GlobalSearch' or its corresponding type declarations.
