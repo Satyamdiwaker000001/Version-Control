@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { User, Palette, Github, Users, Shield, Save, Moon, Sun, Monitor } from 'lucide-react';
-import { useAuthStore } from '@/features/auth/store/useAuthStore';
-import { useThemeStore } from '@/shared/store/useThemeStore';
+import { useNavigate } from 'react-router-dom';
 import type { ThemeMode } from '@/shared/store/useThemeStore';
 import { toast } from 'sonner';
+import { useThemeContext } from '@/shared/contexts/ThemeContext';
+import { useAuthContext } from '@/shared/contexts/AuthContext';
+import { useWorkspaceContext } from '@/shared/contexts/WorkspaceContext';
+import { githubService } from '@/features/github/services/githubService';
 
 type SettingsTab = 'profile' | 'theme' | 'github' | 'workspace';
 
@@ -21,7 +24,7 @@ export const SettingsPage = () => {
     <div className="max-w-4xl mx-auto py-6 animate-in fade-in duration-500">
       <div className="mb-8">
         <h1 className="text-3xl font-extrabold text-zinc-900 dark:text-white tracking-tight">Settings</h1>
-        <p className="text-zinc-500 dark:text-zinc-400 mt-1 placeholder:text-sm">Manage your account settings and preferences.</p>
+        <p className="text-zinc-500 dark:text-zinc-400 mt-1 text-sm">Manage your account settings and preferences.</p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-8">
@@ -63,7 +66,7 @@ export const SettingsPage = () => {
 // --- Tab Components ---
 
 const ProfileSettings = () => {
-  const user = useAuthStore(state => state.user);
+  const { user } = useAuthContext();
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
 
@@ -121,7 +124,7 @@ const ProfileSettings = () => {
 };
 
 const ThemeSettings = () => {
-  const { themeMode, setTheme } = useThemeStore();
+  const { themeMode, setTheme } = useThemeContext();
 
   const handleSetTheme = (mode: ThemeMode) => {
     setTheme(mode);
@@ -163,6 +166,14 @@ const ThemeSettings = () => {
 };
 
 const GithubSettings = () => {
+  const navigate = useNavigate();
+  const [isConnected] = useState(() => githubService.isConnected());
+
+  const statusLabel = isConnected ? 'Authenticated successfully' : 'Not connected';
+  const statusColorClasses = isConnected
+    ? 'text-emerald-600 dark:text-emerald-400'
+    : 'text-zinc-600 dark:text-zinc-400';
+
   return (
     <div className="animate-in fade-in slide-in-from-right-4 duration-300">
       <div className="mb-6">
@@ -175,12 +186,15 @@ const GithubSettings = () => {
       <div className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
          <div>
            <p className="font-semibold text-zinc-900 dark:text-white">Connected Account</p>
-           <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 mt-1">
-              <Shield size={14} /> Authenticated successfully
+           <p className={`text-sm font-medium flex items-center gap-1 mt-1 ${statusColorClasses}`}>
+              <Shield size={14} /> {statusLabel}
            </p>
          </div>
-         <button className="px-4 py-2 border border-zinc-200 dark:border-zinc-700 rounded-md text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-zinc-700 dark:text-zinc-300">
-           Configure Repositories
+         <button
+           onClick={() => navigate('/github')}
+           className="px-4 py-2 border border-zinc-200 dark:border-zinc-700 rounded-md text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-zinc-700 dark:text-zinc-300"
+         >
+           Open GitHub settings
          </button>
       </div>
     </div>
@@ -188,13 +202,48 @@ const GithubSettings = () => {
 };
 
 const WorkspaceSettings = () => {
+  const { activeWorkspace } = useWorkspaceContext();
+  const { user } = useAuthContext();
+  const [filter, setFilter] = useState('');
+
+  if (!activeWorkspace) {
+    return (
+      <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+        <div className="mb-6">
+          <h2 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+            <Users size={20} /> Workspace Members
+          </h2>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            Select a workspace from the sidebar to manage its members.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const members = activeWorkspace.members ?? [];
+  const filteredMembers = members.filter((member) => {
+    if (!filter.trim()) return true;
+    const lower = filter.toLowerCase();
+    return (
+      member.user.name?.toLowerCase().includes(lower) ||
+      member.user.email.toLowerCase().includes(lower) ||
+      member.role.toLowerCase().includes(lower)
+    );
+  });
+
   return (
     <div className="animate-in fade-in slide-in-from-right-4 duration-300">
       <div className="mb-6">
          <h2 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
            <Users size={20} /> Workspace Members
          </h2>
-         <p className="text-sm text-zinc-500 dark:text-zinc-400">Manage who has access to this workspace.</p>
+         <p className="text-sm text-zinc-500 dark:text-zinc-400">
+           Manage who has access to <span className="font-semibold">{activeWorkspace.name}</span>.{' '}
+           <span className="uppercase text-[10px] tracking-wide ml-1 px-1.5 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300">
+             {activeWorkspace.type === 'team' ? 'Team workspace' : 'Solo workspace'}
+           </span>
+         </p>
       </div>
 
       <div className="border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
@@ -202,6 +251,8 @@ const WorkspaceSettings = () => {
           <input 
             type="text" 
             placeholder="Filter members..." 
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
             className="w-full max-w-xs bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 dark:text-zinc-100 transition-colors"
           />
           <button className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-sm font-medium transition-colors ml-4 shadow-sm">
@@ -209,36 +260,40 @@ const WorkspaceSettings = () => {
           </button>
         </div>
         <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
-          <div className="flex items-center justify-between p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-700 dark:text-indigo-400 font-bold text-xs border border-indigo-200 dark:border-indigo-800">
-                A
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-zinc-900 dark:text-white">Alex Johnson <span className="text-xs text-zinc-500 font-normal ml-2">(You)</span></p>
-                <p className="text-xs text-zinc-500">alex@example.com</p>
-              </div>
+          {filteredMembers.length === 0 ? (
+            <div className="p-6 text-sm text-zinc-500 dark:text-zinc-400 text-center">
+              No members match this filter.
             </div>
-            <span className="text-xs font-semibold px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
-              Owner
-            </span>
-          </div>
-          <div className="flex items-center justify-between p-4 bg-zinc-50/50 dark:bg-zinc-900/20">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center text-emerald-700 dark:text-emerald-400 font-bold text-xs border border-emerald-200 dark:border-emerald-800">
-                S
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-zinc-900 dark:text-white">Sarah Chen</p>
-                <p className="text-xs text-zinc-500">sarah@example.com</p>
-              </div>
-            </div>
-            <select className="text-xs font-semibold bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 rounded px-2 py-1 outline-none">
-              <option>Editor</option>
-              <option>Viewer</option>
-              <option className="text-red-500">Remove</option>
-            </select>
-          </div>
+          ) : (
+            filteredMembers.map((member) => {
+              const isCurrentUser = member.user.id === user?.id;
+              const initial = (member.user.name || member.user.email)?.charAt(0)?.toUpperCase() ?? '?';
+
+              return (
+                <div key={member.user.id} className="flex items-center justify-between p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-700 dark:text-indigo-400 font-bold text-xs border border-indigo-200 dark:border-indigo-800">
+                      {initial}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-900 dark:text-white">
+                        {member.user.name || member.user.email}
+                        {isCurrentUser && (
+                          <span className="text-xs text-zinc-500 font-normal ml-2">
+                            (You)
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-zinc-500">{member.user.email}</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-semibold px-2 py-1 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 capitalize">
+                    {member.role}
+                  </span>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>

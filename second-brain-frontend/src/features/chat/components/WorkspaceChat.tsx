@@ -1,19 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, X, MessageSquare, Smile } from 'lucide-react';
 import { useChatStore } from '../store/useChatStore';
-import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
-import { useAuthStore } from '@/features/auth/store/useAuthStore';
+import { useWorkspaceContext } from '@/shared/contexts/WorkspaceContext';
+import { useAuthContext } from '@/shared/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const WorkspaceChat = () => {
   const { messages, isChatOpen, setChatOpen, sendMessage } = useChatStore();
-  const activeWorkspace = useWorkspaceStore(state => state.activeWorkspace);
-  const user = useAuthStore(state => state.user);
+  const { activeWorkspace } = useWorkspaceContext();
+  const { user } = useAuthContext();
   
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const workspaceMessages = messages.filter(m => m.workspaceId === activeWorkspace?.id);
+  const workspaceMessages = messages.filter((m) => m.workspaceId === activeWorkspace?.id);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -25,10 +25,16 @@ export const WorkspaceChat = () => {
     }
   }, [workspaceMessages, isChatOpen]);
 
+  useEffect(() => {
+    if (activeWorkspace?.type !== 'team' && isChatOpen) {
+      setChatOpen(false);
+    }
+  }, [activeWorkspace, isChatOpen, setChatOpen]);
+
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() || !activeWorkspace) return;
-    
+
     sendMessage(activeWorkspace.id, inputText);
     setInputText('');
   };
@@ -106,7 +112,7 @@ export const WorkspaceChat = () => {
                       
                       {/* Message Body */}
                       <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[75%]`}>
-                        <div className="flex items-baseline gap-2 mb-1 hidden">
+                        <div className="hidden items-baseline gap-2 mb-1">
                           <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
                             {isMe ? 'You' : msg.user.name}
                           </span>

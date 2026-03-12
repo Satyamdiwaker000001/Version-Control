@@ -1,90 +1,89 @@
 import { create } from 'zustand';
 import type { Note, NodeVersion } from '@/shared/types';
-
-import axios from 'axios';
+import { noteService } from '../services/noteService';
 
 export interface NoteState {
   notes: Note[];
   versions: NodeVersion[];
+  isLoading: boolean;
+  error: string | null;
   
-  createNote: (note: Omit<Note, 'id' | 'createdAt' | 'updatedAt' | 'versionCount' | 'latestVersionId'>) => void;
-  updateNote: (id: string, content: string, commitMessage: string, authorId: string) => void;
+  fetchNotes: (workspaceId: string, token: string) => Promise<void>;
+  createNote: (note: Omit<Note, 'id' | 'createdAt' | 'updatedAt' | 'versionCount' | 'latestVersionId'>, token: string) => Promise<void>;
+  updateNote: (id: string, content: string, commitMessage: string, authorId: string, token: string) => Promise<void>;
   getNoteVersions: (noteId: string) => NodeVersion[];
   fetchNoteHistory: (workspaceId: string, slug: string, token: string) => Promise<void>;
-  togglePin: (id: string) => void;
+  togglePin: (id: string, token: string) => Promise<void>;
 }
 
-// Mock initial data
-const mockNotes: Note[] = [
-  {
-    id: 'n1', workspaceId: 'ws1', userId: '1', title: 'Neural Networks Basics',
-    content: '# Neural Networks\nA neural network is a series of algorithms...',
-    tags: ['machine-learning', 'draft'], backlinks: [],
-    versionCount: 4, latestVersionId: 'v4', isPinned: true,
-    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-    updatedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-    linkedRepositoryId: 'repo1'
-  },
-  {
-    id: 'n2', workspaceId: 'ws1', userId: '1', title: 'Transformer Architecture',
-    content: 'Transformers rely heavily on attention mechanisms.',
-    tags: ['nlp', 'important'], backlinks: ['n1'],
-    versionCount: 1, latestVersionId: 'v1', isPinned: false,
-    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-    updatedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-  }
-];
-
 export const useNoteStore = create<NoteState>((set, get) => ({
-  notes: mockNotes,
-  versions: [], // Would contain actual historical snapshots
+  notes: [],
+  versions: [],
+  isLoading: false,
+  error: null,
   
-  createNote: (noteData) => set((state) => {
-    const id = `n${Date.now()}`;
-    const newNote: Note = {
-      ...noteData, id, versionCount: 1, latestVersionId: `v${Date.now()}`,
-      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
-    };
-    return { notes: [newNote, ...state.notes] };
-  }),
+  fetchNotes: async (workspaceId, token) => {
+    set({ isLoading: true, error: null });
+    try {
+      const notes = await noteService.getNotes(workspaceId, token);
+      set({ notes, isLoading: false });
+    } catch (error: unknown) {
+      set({ error: error instanceof Error ? error.message : 'Failed to fetch notes', isLoading: false });
+    }
+  },
+
+  createNote: async (noteData, token) => {
+    set({ isLoading: true, error: null });
+    try {
+      const newNote = await noteService.createNote(noteData, token);
+      set((state) => ({ notes: [newNote, ...state.notes], isLoading: false }));
+    } catch (error: unknown) {
+      set({ error: error instanceof Error ? error.message : 'Failed to create note', isLoading: false });
+    }
+  },
   
-  updateNote: (id, content, _commitMessage, _authorId) => set((state) => {
-    // In real app: create version snapshot, update note list
-    return {
-      notes: state.notes.map(n => n.id === id 
-        ? { ...n, content, updatedAt: new Date().toISOString(), versionCount: n.versionCount + 1 }
-        : n)
-    };
-  }),
+  updateNote: async (id, content, commitMessage, authorId, token) => {
+    set({ isLoading: true, error: null });
+    try {
+      const updatedNote = await noteService.updateNote(id, { content, commitMessage, authorId }, token);
+      set((state) => ({
+        notes: state.notes.map(n => n.id === id ? updatedNote : n),
+        isLoading: false
+      }));
+    } catch (error: unknown) {
+      set({ error: error instanceof Error ? error.message : 'Failed to update note', isLoading: false });
+    }
+  },
 
   getNoteVersions: (noteId) => {
     return get().versions.filter(v => v.noteId === noteId);
   },
   
   fetchNoteHistory: async (workspaceId, slug, token) => {
-     try {
-       const res = await axios.get(`http://localhost:3001/api/notes/${workspaceId}/${slug}/history`, {
-         headers: { Authorization: `Bearer ${token}` }
-       });
-       // Map history into NodeVersion format
-       const newVersions: NodeVersion[] = res.data.history.map((h: any) => ({
-         id: h.sha,
-         noteId: slug,
-         content: '', // Not strictly pulled in history list usually
-         timestamp: h.date,
-         authorId: h.author,
-         message: h.message
-       }));
-       
-       set((state) => ({
-         versions: [...state.versions.filter(v => v.noteId !== slug), ...newVersions]
-       }));
-     } catch (e) {
-       console.error('Failed to fetch note history', e);
-     }
+    set({ isLoading: true, error: null });
+    try {
+      const newVersions = await noteService.getNoteHistory(workspaceId, slug, token);
+      set((state) => ({
+        versions: [...state.versions.filter(v => v.noteId !== slug), ...newVersions],
+        isLoading: false
+      }));
+    } catch (error: unknown) {
+      set({ error: error instanceof Error ? error.message : 'Failed to fetch note history', isLoading: false });
+    }
   },
 
-  togglePin: (id) => set((state) => ({
-    notes: state.notes.map(n => n.id === id ? { ...n, isPinned: !n.isPinned } : n)
-  })),
+  togglePin: async (id, token) => {
+    const note = get().notes.find(n => n.id === id);
+    if (!note) return;
+    
+    try {
+      await noteService.updateNote(id, { isPinned: !note.isPinned }, token);
+      set((state) => ({
+        notes: state.notes.map(n => n.id === id ? { ...n, isPinned: !n.isPinned } : n)
+      }));
+    } catch (error: unknown) {
+      set({ error: error instanceof Error ? error.message : 'Failed to toggle pin' });
+    }
+  },
 }));
+

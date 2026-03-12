@@ -33,8 +33,8 @@ export const RegisterPage = () => {
       setAuth(response.user, response.token);
       toast.success('Account created successfully');
       navigate('/');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to register');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to register');
     }
   };
 

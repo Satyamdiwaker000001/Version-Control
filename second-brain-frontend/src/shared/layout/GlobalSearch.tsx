@@ -1,23 +1,44 @@
 import { useState, useEffect } from 'react';
+import type { ChangeEvent } from 'react';
 import { Search, Sparkles, FileText, Hash } from 'lucide-react';
+
+type GlobalSearchResult =
+  | { id: string; title: string; type: 'note'; match: string }
+  | { id: string; title: string; type: 'tag'; match: string };
 
 export const GlobalSearch = () => {
   const [query, setQuery] = useState('');
   const [isSemantic, setIsSemantic] = useState(false);
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<GlobalSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+
+  const isQueryTooShort = query.trim().length < 2;
+  const displayResults = isQueryTooShort ? [] : results;
+
+  const handleQueryChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setQuery(value);
+
+    if (value.trim().length < 2) {
+      setResults([]);
+      setIsSearching(false);
+    } else {
+      setIsSearching(true);
+    }
+  };
 
   // Mock search function
   useEffect(() => {
-    if (query.trim().length < 2) {
-      setResults([]);
+    if (isQueryTooShort) {
       return;
     }
 
-    setIsSearching(true);
+    let isActive = true;
+
     const timeoutId = setTimeout(() => {
-      // Mock results
-      const mockResults = [
+      if (!isActive) return;
+
+      const mockResults: GlobalSearchResult[] = [
         { id: '1', title: 'Neural Networks Basics', type: 'note', match: 'Found in title: "Neural Networks"' },
         { id: '2', title: 'Machine Learning Study Guide', type: 'note', match: 'Found in content: "...types of neural networks include..."' },
         { id: '3', title: '#ai', type: 'tag', match: 'Related tag' }
@@ -25,16 +46,22 @@ export const GlobalSearch = () => {
 
       if (isSemantic && query.toLowerCase().includes('brain')) {
         mockResults.unshift({
-          id: '4', title: 'Cognitive Architecture', type: 'note', match: 'Semantically related to "brain" (94% match)'
+          id: '4',
+          title: 'Cognitive Architecture',
+          type: 'note',
+          match: 'Semantically related to "brain" (94% match)'
         });
       }
 
       setResults(mockResults);
       setIsSearching(false);
-    }, isSemantic ? 800 : 300); // Simulate semantic search being slower
+    }, isSemantic ? 800 : 300);
 
-    return () => clearTimeout(timeoutId);
-  }, [query, isSemantic]);
+    return () => {
+      isActive = false;
+      clearTimeout(timeoutId);
+    };
+  }, [query, isSemantic, isQueryTooShort]);
 
   return (
     <div className="w-full h-full flex flex-col bg-white dark:bg-zinc-950">
@@ -49,7 +76,7 @@ export const GlobalSearch = () => {
         
         <input
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={handleQueryChange}
           className="flex h-12 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-zinc-500"
           placeholder={isSemantic ? "Ask your knowledge base anything natively..." : "Search notes, tags, or content..."}
           autoFocus
@@ -76,12 +103,12 @@ export const GlobalSearch = () => {
              <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3"></div>
              <p className="text-sm">{isSemantic ? 'Running semantic vector search...' : 'Searching...'}</p>
            </div>
-        ) : results.length > 0 ? (
+        ) : displayResults.length > 0 ? (
           <div className="space-y-1">
              <div className="px-2 py-1.5 text-xs font-semibold text-zinc-500">
                {isSemantic ? 'AI Matches' : 'Results'}
              </div>
-             {results.map(result => (
+             {displayResults.map(result => (
                <div 
                  key={result.id}
                  className="flex items-start gap-3 p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 cursor-pointer transition-colors group"

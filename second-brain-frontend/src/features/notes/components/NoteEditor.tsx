@@ -1,24 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNoteStore } from '@/features/notes/store/useNoteStore';
+import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { Save, GitCommit, Settings2, PlaySquare } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const NoteEditor = ({ noteId }: { noteId: string }) => {
   const note = useNoteStore(state => state.notes.find(n => n.id === noteId));
   const updateNote = useNoteStore(state => state.updateNote);
+  const { token } = useAuthStore();
   
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState(note?.content ?? '');
   const [commitMessage, setCommitMessage] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
-
-  // Sync state when active note changes
-  useEffect(() => {
-    if (note) {
-      setContent(note.content);
-    } else {
-      setContent('');
-    }
-  }, [note]);
 
   if (!note) {
     return (
@@ -35,7 +28,11 @@ export const NoteEditor = ({ noteId }: { noteId: string }) => {
   };
 
   const confirmCommit = () => {
-    updateNote(note.id, content, commitMessage || 'Update content', 'mockUserId');
+    if (!token) {
+      toast.error('Authentication required');
+      return;
+    }
+    updateNote(note.id, content, commitMessage || 'Update content', 'mockUserId', token);
     toast.success('Version committed to history', {
       description: `Commit "${commitMessage || 'Update content'}" created successfully.`
     });

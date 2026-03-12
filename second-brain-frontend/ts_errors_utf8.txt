@@ -1,0 +1,1 @@
+﻿src/features/notes/components/NoteEditor.tsx(38,5): error TS2554: Expected 5 arguments, but got 4.

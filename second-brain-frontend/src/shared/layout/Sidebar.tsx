@@ -1,8 +1,8 @@
 import { Home, FileText, Hash, Share2, Settings, LogOut, Github } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/shared/utils/cn';
-import { useAuthStore } from '@/features/auth/store/useAuthStore';
-import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
+import { useAuthContext } from '@/shared/contexts/AuthContext';
+import { useWorkspaceContext } from '@/shared/contexts/WorkspaceContext';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -15,20 +15,29 @@ const navItems = [
   { name: 'Settings', path: '/settings', icon: Settings },
 ];
 
+const isRouteActive = (pathname: string, targetPath: string) => {
+  if (targetPath === '/') {
+    return pathname === '/';
+  }
+
+  if (pathname === targetPath) return true;
+
+  return pathname.startsWith(`${targetPath}/`);
+};
+
 export const Sidebar = () => {
   const location = useLocation();
-  const logout = useAuthStore((state) => state.logout);
-
-  const { workspaces, activeWorkspace, setActiveWorkspace } = useWorkspaceStore();
+  const { logout } = useAuthContext();
+  const { workspaces, activeWorkspace, setActiveWorkspace } = useWorkspaceContext();
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
 
   return (
-    <aside className="w-64 bg-zinc-900 dark:bg-zinc-950 border-r border-zinc-800 flex flex-col transition-colors absolute sm:relative z-40 h-full">
+    <aside className="w-64 bg-white dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800 flex flex-col transition-colors h-full">
       
       {/* Workspace Switcher */}
-      <div className="p-4 border-b border-zinc-800">
+      <div className="p-4 border-b border-zinc-200 dark:border-zinc-800">
         <div 
-          className="flex items-center justify-between p-2 hover:bg-zinc-800 rounded-lg cursor-pointer transition-colors group relative"
+          className="flex items-center justify-between p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg cursor-pointer transition-colors group relative"
           onClick={() => setIsWorkspaceOpen(!isWorkspaceOpen)}
         >
           <div className="flex items-center gap-3 overflow-hidden">
@@ -36,10 +45,10 @@ export const Sidebar = () => {
               {activeWorkspace?.name.charAt(0) || 'W'}
             </div>
             <div className="truncate">
-              <p className="text-sm font-semibold text-zinc-100 truncate group-hover:text-white transition-colors">
+              <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 truncate group-hover:text-indigo-600 dark:group-hover:text-white transition-colors">
                 {activeWorkspace?.name || 'Select Workspace'}
               </p>
-              <p className="text-xs text-zinc-400 truncate">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
                 {activeWorkspace?.role === 'owner' ? 'Owner' : 'Member'}
               </p>
             </div>
@@ -109,28 +118,72 @@ export const Sidebar = () => {
         <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1 px-3 mt-2">
           Main
         </div>
-        {navItems.filter(i => ['Dashboard', 'All Notes', 'Tags', 'Graph View'].includes(i.name)).map((item) => {
-          const Icon = item.icon;
-          const isActive = location.pathname === item.path;
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all group",
-                isActive 
-                  ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white" 
-                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-white"
-              )}
-            >
-              <Icon size={18} className={cn(
-                "transition-colors",
-                isActive ? "text-indigo-500 dark:text-indigo-400" : "text-zinc-400 group-hover:text-zinc-500 dark:group-hover:text-zinc-300"
-              )} />
-              {item.name}
-            </Link>
-          );
-        })}
+        {navItems
+          .filter((i) => ['Dashboard', 'All Notes', 'Tags', 'Graph View'].includes(i.name))
+          .map((item) => {
+            const Icon = item.icon;
+            const isActive = isRouteActive(location.pathname, item.path);
+
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all group",
+                  isActive
+                    ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white"
+                    : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-white"
+                )}
+              >
+                <Icon
+                  size={18}
+                  className={cn(
+                    "transition-colors",
+                    isActive
+                      ? "text-indigo-500 dark:text-indigo-400"
+                      : "text-zinc-400 group-hover:text-zinc-500 dark:group-hover:text-zinc-300"
+                  )}
+                />
+                {item.name}
+              </Link>
+            );
+          })}
+
+        <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1 px-3 mt-6">
+          Workspaces
+        </div>
+        <div className="space-y-1">
+          {workspaces.map((ws) => {
+            const isActive = activeWorkspace?.id === ws.id;
+
+            return (
+              <button
+                key={ws.id}
+                type="button"
+                onClick={() => setActiveWorkspace(ws.id)}
+                className={cn(
+                  "w-full flex items-center justify-between gap-2 px-3 py-2 rounded-md text-xs font-medium text-left transition-all",
+                  isActive
+                    ? "bg-zinc-900 text-zinc-50 dark:bg-zinc-800"
+                    : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/70 hover:text-zinc-900 dark:hover:text-zinc-100"
+                )}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-6 h-6 rounded-md bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
+                    {ws.name.charAt(0)}
+                  </div>
+                  <div className="flex flex-col min-w-0">
+                    <span className="truncate">{ws.name}</span>
+                    <span className="text-[9px] uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                      {ws.type === 'team' ? 'Team' : 'Solo'}
+                    </span>
+                  </div>
+                </div>
+                {isActive && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
 
         <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1 px-3 mt-6">
           Integrations
@@ -139,16 +192,21 @@ export const Sidebar = () => {
           to="/github"
           className={cn(
             "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all group",
-            location.pathname === "/github" 
-              ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white" 
+            isRouteActive(location.pathname, "/github")
+              ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white"
               : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-white"
           )}
         >
-          <Github size={18} className={cn(
-            "transition-colors",
-            location.pathname === "/github" ? "text-indigo-500 dark:text-indigo-400" : "text-zinc-400 group-hover:text-zinc-500 dark:group-hover:text-zinc-300"
-          )} />
-          GitHub Target
+          <Github
+            size={18}
+            className={cn(
+              "transition-colors",
+              isRouteActive(location.pathname, "/github")
+                ? "text-indigo-500 dark:text-indigo-400"
+                : "text-zinc-400 group-hover:text-zinc-500 dark:group-hover:text-zinc-300"
+            )}
+          />
+          GitHub
         </Link>
         
         <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1 px-3 mt-6">
@@ -158,15 +216,20 @@ export const Sidebar = () => {
           to="/settings"
           className={cn(
             "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all group",
-            location.pathname === "/settings" 
-              ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white" 
+            isRouteActive(location.pathname, "/settings")
+              ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white"
               : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-white"
           )}
         >
-          <Settings size={18} className={cn(
-            "transition-colors",
-            location.pathname === "/settings" ? "text-indigo-500 dark:text-indigo-400" : "text-zinc-400 group-hover:text-zinc-500 dark:group-hover:text-zinc-300"
-          )} />
+          <Settings
+            size={18}
+            className={cn(
+              "transition-colors",
+              isRouteActive(location.pathname, "/settings")
+                ? "text-indigo-500 dark:text-indigo-400"
+                : "text-zinc-400 group-hover:text-zinc-500 dark:group-hover:text-zinc-300"
+            )}
+          />
           Settings
         </Link>
       </div>

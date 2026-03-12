@@ -5,25 +5,66 @@ import { Github, RefreshCw, FolderGit2, Star, Plus, ArrowRight } from 'lucide-re
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { GithubInsightsDashboard } from './GithubInsightsDashboard';
+import { EmptyState } from '@/shared/ui/EmptyState';
+import { ErrorState } from '@/shared/ui/ErrorState';
 
 export const GithubConnectPage = () => {
   const [isConnected, setIsConnected] = useState(githubService.isConnected());
   const [isConnecting, setIsConnecting] = useState(false);
   const [repositories, setRepositories] = useState<GithubRepository[]>([]);
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
+  const [reposError, setReposError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isConnected) {
-      loadRepositories();
-    }
+    if (!isConnected) return;
+    let isMounted = true;
+
+    const fetchRepos = async () => {
+      setIsLoadingRepos(true);
+      setReposError(null);
+      try {
+        const repos = await githubService.getRepositories();
+        if (isMounted) {
+          setRepositories(repos);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setReposError(
+            error instanceof Error
+              ? error.message
+              : 'Failed to load repositories from GitHub.',
+          );
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingRepos(false);
+        }
+      }
+    };
+
+    void fetchRepos();
+
+    return () => {
+      isMounted = false;
+    };
   }, [isConnected]);
 
   const loadRepositories = async () => {
     setIsLoadingRepos(true);
-    const repos = await githubService.getRepositories();
-    setRepositories(repos);
-    setIsLoadingRepos(false);
+    setReposError(null);
+    try {
+      const repos = await githubService.getRepositories();
+      setRepositories(repos);
+    } catch (error) {
+      setReposError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to load repositories from GitHub.',
+      );
+    } finally {
+      setIsLoadingRepos(false);
+    }
   };
 
   const handleConnect = async () => {
@@ -110,9 +151,24 @@ export const GithubConnectPage = () => {
               [1, 2, 3].map(i => (
                 <div key={i} className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 h-48 animate-pulse"></div>
               ))
+            ) : reposError ? (
+              <div className="col-span-full py-8">
+                <ErrorState
+                  title="Failed to load repositories"
+                  description={reposError}
+                  onRetry={loadRepositories}
+                  retryLabel="Retry loading"
+                />
+              </div>
             ) : repositories.length === 0 ? (
-              <div className="col-span-full py-12 text-center text-zinc-500 border border-dashed border-zinc-300 dark:border-zinc-700 rounded-xl">
-                No repositories found on this account.
+              <div className="col-span-full">
+                <EmptyState
+                  title="No repositories found"
+                  description="We couldn’t find any repositories for this GitHub account."
+                  icon={<FolderGit2 className="w-8 h-8 text-zinc-400" />}
+                  actionLabel="Reload repositories"
+                  onAction={loadRepositories}
+                />
               </div>
             ) : (
               repositories.map(repo => (

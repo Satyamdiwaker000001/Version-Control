@@ -1,122 +1,104 @@
-export interface GithubRepository {
+import { apiClient } from '@/shared/api/apiClient';
+
+export interface GitHubRepository {
   id: string;
   name: string;
-  fullName: string;
-  description: string;
-  language: string;
-  stargazersCount: number;
-  updatedAt: string;
-  synced: boolean;
+  owner: string;
+  url: string;
+  description?: string;
+  stars: number;
+  forks: number;
+  language?: string;
+  isPrivate: boolean;
+  connectedAt: string;
 }
 
-export interface GithubCommit {
+export interface GitHubCommit {
   sha: string;
   message: string;
   author: string;
   date: string;
-  addedFiles: number;
-  modifiedFiles: number;
-  removedFiles: number;
+  url: string;
+}
+
+export interface GitHubBranch {
+  name: string;
+  isDefault: boolean;
+  latestCommit: GitHubCommit;
+}
+
+export interface GitHubIssue {
+  number: number;
+  title: string;
+  state: 'open' | 'closed';
+  author: string;
+  createdAt: string;
+  url: string;
+  labels: string[];
+}
+
+export interface ConnectGitHubInput {
+  workspaceId: string;
+  owner: string;
+  repo: string;
 }
 
 export const githubService = {
-  connect: async (): Promise<boolean> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        localStorage.setItem('github_token', 'mock_token_123');
-        resolve(true);
-      }, 1000);
-    });
+  // Connect a GitHub repository to workspace
+  async connectRepository(input: ConnectGitHubInput): Promise<GitHubRepository> {
+    return apiClient.post<GitHubRepository>(
+      `/workspaces/${input.workspaceId}/github/repositories`,
+      { owner: input.owner, repo: input.repo }
+    );
   },
 
-  disconnect: async (): Promise<void> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        localStorage.removeItem('github_token');
-        resolve();
-      }, 500);
-    });
+  // Fetch connected repositories
+  async getRepositories(workspaceId: string): Promise<GitHubRepository[]> {
+    return apiClient.get<GitHubRepository[]>(`/workspaces/${workspaceId}/github/repositories`);
   },
 
-  isConnected: (): boolean => {
-    return !!localStorage.getItem('github_token');
+  // Fetch a single repository
+  async getRepository(workspaceId: string, repoId: string): Promise<GitHubRepository> {
+    return apiClient.get<GitHubRepository>(
+      `/workspaces/${workspaceId}/github/repositories/${repoId}`
+    );
   },
 
-  getRepositories: async (): Promise<GithubRepository[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve([
-          {
-            id: 'repo1',
-            name: 'second-brain-api',
-            fullName: 'developer/second-brain-api',
-            description: 'Backend Node.js server for the Second Brain platform',
-            language: 'TypeScript',
-            stargazersCount: 142,
-            updatedAt: new Date().toISOString(),
-            synced: true
-          },
-          {
-            id: 'repo2',
-            name: 'phishguard-ai',
-            fullName: 'developer/phishguard-ai',
-            description: 'Real-time phishing detection ecosystem',
-            language: 'Python',
-            stargazersCount: 89,
-            updatedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-            synced: false
-          },
-          {
-            id: 'repo3',
-            name: 'legacy-auth-service',
-            fullName: 'developer/legacy-auth-service',
-            description: 'Old JWT validation server',
-            language: 'Go',
-            stargazersCount: 12,
-            updatedAt: new Date(Date.now() - 86400000 * 45).toISOString(),
-            synced: false
-          }
-        ]);
-      }, 600);
-    });
-  },
-  
-  syncRepository: async (repoId: string): Promise<boolean> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        console.log(`Repository ${repoId} synced to workspace.`);
-        resolve(true);
-      }, 800);
-    });
+  // Get repository commits
+  async getCommits(workspaceId: string, repoId: string, limit: number = 20): Promise<GitHubCommit[]> {
+    return apiClient.get<GitHubCommit[]>(
+      `/workspaces/${workspaceId}/github/repositories/${repoId}/commits?limit=${limit}`
+    );
   },
 
-  getRepoCommits: async (_repoId: string): Promise<GithubCommit[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve([
-          {
-            sha: 'a1b2c3d4e5f6',
-            message: 'feat(ai): Implement knowledge extraction engine',
-            author: 'Developer',
-            date: new Date().toISOString(),
-            addedFiles: 3, modifiedFiles: 5, removedFiles: 0
-          },
-          {
-            sha: 'f87e6d5c4b3a',
-            message: 'refactor: Move to feature-based architecture',
-            author: 'Developer',
-            date: new Date(Date.now() - 86400000).toISOString(),
-            addedFiles: 12, modifiedFiles: 42, removedFiles: 8
-          },
-          {
-            sha: '9c8b7a6f5e4d',
-            message: 'fix(auth): Revolve JWT invalidation bug',
-            author: 'Colleague',
-            date: new Date(Date.now() - 86400000 * 3).toISOString(),
-            addedFiles: 0, modifiedFiles: 2, removedFiles: 0
-          }
-        ]);
-      }, 600);
-    });
-  }
+  // Get repository branches
+  async getBranches(workspaceId: string, repoId: string): Promise<GitHubBranch[]> {
+    return apiClient.get<GitHubBranch[]>(
+      `/workspaces/${workspaceId}/github/repositories/${repoId}/branches`
+    );
+  },
+
+  // Get repository issues
+  async getIssues(workspaceId: string, repoId: string, state: 'open' | 'closed' | 'all' = 'open'): Promise<GitHubIssue[]> {
+    return apiClient.get<GitHubIssue[]>(
+      `/workspaces/${workspaceId}/github/repositories/${repoId}/issues?state=${state}`
+    );
+  },
+
+  // Disconnect a repository
+  async disconnectRepository(workspaceId: string, repoId: string): Promise<void> {
+    await apiClient.delete(
+      `/workspaces/${workspaceId}/github/repositories/${repoId}`
+    );
+  },
+
+  // Search GitHub repositories
+  async searchRepositories(query: string, limit: number = 10): Promise<any[]> {
+    return apiClient.get<any[]>(`/github/search/repositories?q=${query}&limit=${limit}`);
+  },
+
+  // Get GitHub user info
+  async getUserInfo(): Promise<any> {
+    return apiClient.get('/github/user');
+  },
 };

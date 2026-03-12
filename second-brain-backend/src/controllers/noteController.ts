@@ -1,10 +1,8 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middlewares/authMiddleware';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { Octokit } from 'octokit';
 import { z } from 'zod';
-
-const prisma = new PrismaClient();
 
 const generateSlug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
@@ -17,7 +15,7 @@ export const noteController = {
   // Returns all markdown notes in the `notes/` directory for the active workspace repo
   listNotes: async (req: AuthRequest, res: Response) => {
     try {
-      const workspaceId = req.params.workspaceId;
+      const workspaceId = req.params.workspaceId as string;
       const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
 
       if (!workspace || !workspace.githubAccessToken || !workspace.githubOwner || !workspace.githubRepo) {
@@ -59,7 +57,7 @@ export const noteController = {
   // Reads a specific markdown file
   getNote: async (req: AuthRequest, res: Response) => {
     try {
-      const { workspaceId, slug } = req.params;
+      const { workspaceId, slug } = req.params as { workspaceId: string; slug: string };
       const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
 
       if (!workspace || !workspace.githubAccessToken || !workspace.githubOwner || !workspace.githubRepo) {
@@ -94,7 +92,7 @@ export const noteController = {
   // Creates or updates a markdown file
   saveNote: async (req: AuthRequest, res: Response) => {
     try {
-      const { workspaceId } = req.params;
+      const { workspaceId } = req.params as { workspaceId: string };
       const { title, content, sha } = req.body; // sha is required for updates
       
       if (!title) return res.status(400).json({ error: 'Title required' });
@@ -137,7 +135,7 @@ export const noteController = {
   // Gets commit history for a specific Markdown file
   getHistory: async (req: AuthRequest, res: Response) => {
     try {
-      const { workspaceId, slug } = req.params;
+      const { workspaceId, slug } = req.params as { workspaceId: string; slug: string };
       const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
 
       if (!workspace || !workspace.githubAccessToken || !workspace.githubOwner || !workspace.githubRepo) {

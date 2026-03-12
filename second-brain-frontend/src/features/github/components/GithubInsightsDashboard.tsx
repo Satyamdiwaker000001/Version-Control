@@ -1,8 +1,8 @@
 import { BrainCircuit, BookCheck, GitBranch, TerminalSquare } from 'lucide-react';
-import { useNoteStore } from '@/features/notes/store/useNoteStore';
+import { useNotesContext } from '@/shared/contexts/NotesContext';
 
 export const GithubInsightsDashboard = () => {
-  const notes = useNoteStore(state => state.notes);
+  const { notes } = useNotesContext();
   
   // Calculate mock insights
   const repoLinkedNotes = notes.filter(n => n.linkedRepositoryId).length;

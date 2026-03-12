@@ -1,10 +1,8 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { AuthRequest } from '../middlewares/authMiddleware';
 import { Octokit } from 'octokit';
-
-const prisma = new PrismaClient();
 
 const linkWorkspaceSchema = z.object({
   name: z.string().min(1),
@@ -66,7 +64,7 @@ export const workspaceController = {
 
   listCollaborators: async (req: AuthRequest, res: Response) => {
     try {
-      const { workspaceId } = req.params;
+      const { workspaceId } = req.params as { workspaceId: string };
       const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
 
       if (!workspace || !workspace.githubAccessToken || !workspace.githubOwner || !workspace.githubRepo) {

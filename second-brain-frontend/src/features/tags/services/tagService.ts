@@ -1,30 +1,61 @@
-import type { Tag } from '@/shared/types';
+import { apiClient } from '@/shared/api/apiClient';
 
-const MOCK_TAGS: Tag[] = [
-  { id: 't1', name: 'Machine Learning', color: '#10b981' }, // emarald
-  { id: 't2', name: 'NLP', color: '#3b82f6' }, // blue
-  { id: 't3', name: 'Important', color: '#ef4444' }, // red
-  { id: 't4', name: 'Draft', color: '#f59e0b' }, // amber
-  { id: 't5', name: 'Architecture', color: '#6366f1' }, // indigo
-];
+export interface Tag {
+  id: string;
+  workspaceId: string;
+  name: string;
+  color: string;
+  description?: string;
+  createdAt: string;
+  createdBy: string;
+  noteCount: number;
+}
+
+export interface CreateTagInput {
+  workspaceId: string;
+  name: string;
+  color: string;
+  description?: string;
+}
+
+export interface UpdateTagInput {
+  name?: string;
+  color?: string;
+  description?: string;
+}
 
 export const tagService = {
-  getTags: async (): Promise<Tag[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => resolve([...MOCK_TAGS]), 400);
+  // Fetch all tags in a workspace
+  async getTags(workspaceId: string): Promise<Tag[]> {
+    return apiClient.get<Tag[]>(`/workspaces/${workspaceId}/tags`);
+  },
+
+  // Fetch a single tag
+  async getTag(workspaceId: string, tagId: string): Promise<Tag> {
+    return apiClient.get<Tag>(`/workspaces/${workspaceId}/tags/${tagId}`);
+  },
+
+  // Create a new tag
+  async createTag(input: CreateTagInput): Promise<Tag> {
+    return apiClient.post<Tag>(`/workspaces/${input.workspaceId}/tags`, {
+      name: input.name,
+      color: input.color,
+      description: input.description,
     });
   },
 
-  createTag: async (name: string, color: string): Promise<Tag> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const newTag: Tag = {
-          id: `t${Date.now()}`,
-          name,
-          color
-        };
-        resolve(newTag);
-      }, 500);
-    });
-  }
+  // Update a tag
+  async updateTag(workspaceId: string, tagId: string, input: UpdateTagInput): Promise<Tag> {
+    return apiClient.put<Tag>(`/workspaces/${workspaceId}/tags/${tagId}`, input);
+  },
+
+  // Delete a tag
+  async deleteTag(workspaceId: string, tagId: string): Promise<void> {
+    await apiClient.delete(`/workspaces/${workspaceId}/tags/${tagId}`);
+  },
+
+  // Get notes with a specific tag
+  async getNotesByTag(workspaceId: string, tagId: string): Promise<any[]> {
+    return apiClient.get<any[]>(`/workspaces/${workspaceId}/tags/${tagId}/notes`);
+  },
 };

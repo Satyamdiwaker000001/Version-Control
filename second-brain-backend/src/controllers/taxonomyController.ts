@@ -1,15 +1,13 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middlewares/authMiddleware';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { Octokit } from 'octokit';
-
-const prisma = new PrismaClient();
 
 export const taxonomyController = {
   // Reads a JSON config file
   getConfig: async (req: AuthRequest, res: Response) => {
     try {
-      const { workspaceId, type } = req.params; // type: 'tags' | 'graph'
+      const { workspaceId, type } = req.params as { workspaceId: string; type: string }; // type: 'tags' | 'graph'
       const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
 
       if (!workspace || !workspace.githubAccessToken || !workspace.githubOwner || !workspace.githubRepo) {
@@ -46,7 +44,7 @@ export const taxonomyController = {
   // Updates a JSON config file
   updateConfig: async (req: AuthRequest, res: Response) => {
     try {
-      const { workspaceId, type } = req.params;
+      const { workspaceId, type } = req.params as { workspaceId: string; type: string };
       const { payload, sha } = req.body;
       const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
 

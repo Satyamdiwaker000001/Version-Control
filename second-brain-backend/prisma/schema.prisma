@@ -7,28 +7,150 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
 }
 
 model User {
   id              String      @id @default(uuid())
   email           String      @unique
   name            String?
+  avatar          String?
   passwordHash    String
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+  
   workspaces      Workspace[]
+  workspaceMembers WorkspaceMember[]
+  notes           Note[]
+  noteVersions    NoteVersion[]
+  messages        Message[]
+  tags            Tag[]
 }
 
 model Workspace {
   id               String   @id @default(uuid())
   name             String
-  type             String   // "solo" or "team"
+  description      String?
+  type             String   // "personal" or "team"
   githubOwner      String?  // GitHub username or organization
   githubRepo       String?  // Exact Repository name (e.g. "second-brain-notes")
   githubAccessToken String?  // Authorized token for interacting with the repo
   userId           String
-  user             User     @relation(fields: [userId], references: [id])
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+  
+  members          WorkspaceMember[]
+  notes            Note[]
+  tags             Tag[]
+  messages         Message[]
+  repositories     Repository[]
+  
+  @@index([userId])
 }
+
+model WorkspaceMember {
+  id              String @id @default(uuid())
+  workspaceId     String
+  userId          String
+  role            String // "admin", "member", "viewer"
+  joinedAt        DateTime @default(now())
+  
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user            User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+model Note {
+  id              String   @id @default(uuid())
+  workspaceId     String
+  userId          String
+  title           String
+  content         String
+  description     String?
+  isPublic        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author          User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tags            Tag[] @relation("NoteTags")
+  versions        NoteVersion[]
+  
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+model NoteVersion {
+  id              String   @id @default(uuid())
+  noteId          String
+  userId          String
+  content         String
+  changeDescription String?
+  createdAt       DateTime @default(now())
+  
+  note            Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  author          User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([noteId])
+  @@index([userId])
+}
+
+model Tag {
+  id              String   @id @default(uuid())
+  workspaceId     String
+  userId          String
+  name            String
+  color           String
+  description     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  creator         User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes           Note[] @relation("NoteTags")
+  
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+model Message {
+  id              String   @id @default(uuid())
+  workspaceId     String
+  userId          String
+  content         String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  editedBy        String?
+  
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author          User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Repository {
+  id              String   @id @default(uuid())
+  workspaceId     String
+  owner           String
+  name            String
+  url             String
+  description     String?
+  language        String?
+  stars           Int      @default(0)
+  forks           Int      @default(0)
+  isPrivate       Boolean  @default(false)
+  lastSyncedAt    DateTime?
+  connectedAt     DateTime @default(now())
+  
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  @@unique([workspaceId, owner, name])
+  @@index([workspaceId])
+}
+

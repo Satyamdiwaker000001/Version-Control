@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { NoteTree } from './NoteTree';
 import { NoteEditor } from './NoteEditor';
@@ -6,11 +6,44 @@ import { NoteMetadataPanel } from '@/features/notes/components/NoteMetadataPanel
 import { AIPanel } from '@/features/ai/components/AIPanel';
 import { Activity } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
+import { useNotesContext } from '@/shared/contexts/NotesContext';
+import { useWorkspaceContext } from '@/shared/contexts/WorkspaceContext';
+import { useAuthContext } from '@/shared/contexts/AuthContext';
+import { LoadingSpinner } from '@/shared/ui/LoadingSpinner';
+import { ErrorState } from '@/shared/ui/ErrorState';
 
 export const NoteEditorPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const currentNoteId = searchParams.get('noteId');
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  
+  const { fetchNotes, isLoading, error } = useNotesContext();
+  const { activeWorkspace } = useWorkspaceContext();
+  const { token } = useAuthContext();
+
+  useEffect(() => {
+    if (activeWorkspace && token) {
+      fetchNotes(activeWorkspace.id, token);
+    }
+  }, [activeWorkspace, token, fetchNotes]);
+
+  if (isLoading) {
+    return (
+      <LoadingSpinner fullPage label="Opening your workspace..." />
+    );
+  }
+
+  if (error) {
+    return (
+      <ErrorState
+        title="Failed to load notes"
+        error={error}
+        onRetry={() => window.location.reload()}
+        retryLabel="Retry"
+        fullPage
+      />
+    );
+  }
 
   const handleSelectNote = (id: string) => {
     setSearchParams({ noteId: id });
@@ -30,7 +63,7 @@ export const NoteEditorPage = () => {
       {/* Pane 2: Editor (Center) */}
       <div className="flex-1 flex flex-col min-w-0 relative">
         {currentNoteId ? (
-           <NoteEditor noteId={currentNoteId} />
+           <NoteEditor key={currentNoteId} noteId={currentNoteId} />
         ) : (
            <div className="flex-1 flex flex-col justify-center items-center text-zinc-500 bg-zinc-50 dark:bg-zinc-950/50">
              <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500 flex items-center justify-center mb-4 shadow-sm border border-indigo-100 dark:border-indigo-800">

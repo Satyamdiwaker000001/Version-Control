@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { githubService } from '../services/githubService';
 import type { GithubRepository, GithubCommit } from '../services/githubService';
-import { useNoteStore } from '@/features/notes/store/useNoteStore';
 import { ArrowLeft, GitCommit, MessageSquarePlus, User } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useNotesContext } from '@/shared/contexts/NotesContext';
 
 export const CommitTimelinePage = () => {
   const { id } = useParams<{ id: string }>();
@@ -13,7 +13,7 @@ export const CommitTimelinePage = () => {
   const [commits, setCommits] = useState<GithubCommit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  const notes = useNoteStore(state => state.notes);
+  const { notes } = useNotesContext();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -23,7 +23,7 @@ export const CommitTimelinePage = () => {
         const foundRepo = repos.find(r => r.id === id);
         if (foundRepo) setRepo(foundRepo);
         
-        const fetchedCommits = await githubService.getRepoCommits(id);
+        const fetchedCommits = await githubService.getRepoCommits();
         setCommits(fetchedCommits);
       }
       setIsLoading(false);

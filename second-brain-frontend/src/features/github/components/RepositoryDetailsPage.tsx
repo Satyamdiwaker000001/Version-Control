@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { githubService } from '../services/githubService';
 import type { GithubRepository } from '../services/githubService';
-import { useNoteStore } from '@/features/notes/store/useNoteStore';
 import { FileText, ArrowLeft, Star, GitCommit, Search, Plus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useNotesContext } from '@/shared/contexts/NotesContext';
+import { useWorkspaceContext } from '@/shared/contexts/WorkspaceContext';
+import { useAuthContext } from '@/shared/contexts/AuthContext';
 
 export const RepositoryDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -12,8 +14,15 @@ export const RepositoryDetailsPage = () => {
   const [repo, setRepo] = useState<GithubRepository | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const { notes, fetchNotes } = useNotesContext();
+  const { activeWorkspace } = useWorkspaceContext();
+  const { token } = useAuthContext();
+
   // Get notes associated with this repository
-  const notes = useNoteStore(state => state.notes.filter(n => n.linkedRepositoryId === id));
+  const repoNotes = useMemo(
+    () => notes.filter((n) => n.linkedRepositoryId === id),
+    [notes, id],
+  );
 
   useEffect(() => {
     const fetchRepo = async () => {
@@ -30,6 +39,11 @@ export const RepositoryDetailsPage = () => {
       fetchRepo();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (!activeWorkspace || !token) return;
+    void fetchNotes(activeWorkspace.id, token);
+  }, [activeWorkspace, token, fetchNotes]);
 
   if (isLoading) {
     return <div className="p-8 animate-pulse text-zinc-500">Loading repository details...</div>;
@@ -82,7 +96,7 @@ export const RepositoryDetailsPage = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
         <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
           <p className="text-sm font-medium text-zinc-500">Documented Notes</p>
-          <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">{notes.length}</p>
+          <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">{repoNotes.length}</p>
         </div>
         <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
           <p className="text-sm font-medium text-zinc-500">Knowledge Coverage</p>
@@ -111,7 +125,7 @@ export const RepositoryDetailsPage = () => {
           </div>
         </div>
         
-        {notes.length === 0 ? (
+        {repoNotes.length === 0 ? (
           <div className="py-12 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50/50 dark:bg-zinc-900/20 text-center flex flex-col items-center">
             <FileText className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mb-3" />
             <h3 className="text-zinc-900 dark:text-zinc-100 font-medium">No notes created yet</h3>
@@ -121,10 +135,10 @@ export const RepositoryDetailsPage = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {notes.map(note => (
+            {repoNotes.map(note => (
               <div 
                 key={note.id} 
-                onClick={() => navigate('/editor')}
+                onClick={() => navigate(`/editor?noteId=${note.id}`)}
                 className="bg-white dark:bg-zinc-900 p-5 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md hover:border-indigo-500/30 transition-all cursor-pointer group"
               >
                 <div className="flex justify-between items-start mb-2">

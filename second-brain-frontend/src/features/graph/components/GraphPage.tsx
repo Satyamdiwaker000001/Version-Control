@@ -1,14 +1,18 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
-import type { NodeObject } from 'react-force-graph-2d';
-import { useNoteStore } from '@/features/notes/store/useNoteStore';
-import type { NoteState } from '@/features/notes/store/useNoteStore';
-import { useThemeStore } from '@/shared/store/useThemeStore';
-import type { ThemeState } from '@/shared/store/useThemeStore';
+import type { NodeObject, ForceGraphMethods } from 'react-force-graph-2d';
 import { useTagStore } from '@/features/tags/store/useTagStore';
-import { Network, ZoomIn, ZoomOut, Filter, Tag as TagIcon } from 'lucide-react';
+import { graphService } from '../services/graphService';
+import type { GraphData } from '../services/graphService';
+import { Network, ZoomIn, ZoomOut, Filter, Tag as TagIcon, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/shared/utils/cn';
+import { useThemeContext } from '@/shared/contexts/ThemeContext';
+import { useNotesContext } from '@/shared/contexts/NotesContext';
+import { useWorkspaceContext } from '@/shared/contexts/WorkspaceContext';
+import { useAuthContext } from '@/shared/contexts/AuthContext';
+import { LoadingOverlay } from '@/shared/ui/LoadingSpinner';
+import { ErrorState } from '@/shared/ui/ErrorState';
 
 interface GraphNode {
   id: string;
@@ -30,14 +34,24 @@ const HIGHLIGHT_COLOR = '#8b5cf6'; // Violet
 const HIGHLIGHT_NODE_COLOR = '#a78bfa'; // Lighter violet
 
 export const GraphPage = () => {
-  const notes = useNoteStore((state: NoteState) => state.notes);
-  const isDarkMode = useThemeStore((state: ThemeState) => state.isDarkMode);
+  const { notes, fetchNotes, isLoading: isNotesLoading, error: notesError } = useNotesContext();
+  const { isDarkMode } = useThemeContext();
+  const { token } = useAuthContext();
+  const { activeWorkspace } = useWorkspaceContext();
   const navigate = useNavigate();
-  const fgRef = useRef<any>(null);
+  const fgRef = useRef<ForceGraphMethods | undefined>(undefined);
   const [containerRef, setContainerRef] = useState<HTMLDivElement | null>(null);
 
-  const { tags, loadTags } = useTagStore();
+  const { tags, isLoading: isTagsLoading, error: tagsError, loadTags } = useTagStore((state) => ({
+    tags: state.tags,
+    isLoading: state.isLoading,
+    error: state.error,
+    loadTags: state.loadTags,
+  }));
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [remoteGraphData, setRemoteGraphData] = useState<GraphData | null>(null);
+  const [isGraphLoading, setIsGraphLoading] = useState(false);
+  const [graphError, setGraphError] = useState<string | null>(null);
 
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [hoverNode, setHoverNode] = useState<string | null>(null);
@@ -46,9 +60,27 @@ export const GraphPage = () => {
   const [highlightNodes, setHighlightNodes] = useState(new Set<string>());
   const [highlightLinks, setHighlightLinks] = useState(new Set<GraphLink>());
   
+  const fetchGraphData = useCallback(async () => {
+    if (!activeWorkspace || !token) return;
+    setGraphError(null);
+    setIsGraphLoading(true);
+    try {
+      const data = await graphService.getGraphData(activeWorkspace.id, token);
+      setRemoteGraphData(data);
+    } catch (error) {
+      console.error('Failed to fetch graph data', error);
+      setGraphError('Failed to load knowledge graph from the server.');
+    } finally {
+      setIsGraphLoading(false);
+    }
+  }, [activeWorkspace, token]);
+
   useEffect(() => {
-    if (tags.length === 0) loadTags();
-  }, [tags.length, loadTags]);
+    if (!activeWorkspace || !token) return;
+    fetchNotes(activeWorkspace.id, token);
+    loadTags();
+    fetchGraphData();
+  }, [activeWorkspace, token, fetchNotes, loadTags, fetchGraphData]);
 
   useEffect(() => {
     if (containerRef) {
@@ -64,27 +96,46 @@ export const GraphPage = () => {
     }
   }, [containerRef]);
 
-  // Transform notes into Graph Data
+  const isLoadingAny = isNotesLoading || isTagsLoading || isGraphLoading;
+  const errorMessage = graphError || notesError || tagsError;
+
+  // Transform notes into Graph Data if remote data is not available
   const graphData = useMemo(() => {
-    // 1. Filter nodes based on active tag
+    if (remoteGraphData) {
+        // Map remote data to component format
+        const nodes = remoteGraphData.nodes.map(n => ({
+            id: n.id,
+            name: n.label,
+            val: 4,
+            color: isDarkMode ? '#3f3f46' : '#e4e4e7',
+            fontColor: isDarkMode ? '#f4f4f5' : '#18181b',
+        }));
+        const links = remoteGraphData.links.map(l => ({
+            source: l.source,
+            target: l.target,
+            color: isDarkMode ? '#52525b' : '#d4d4d8'
+        }));
+        return { nodes, links };
+    }
+
+    // Fallback: Build from notes store
     const filteredNotes = activeTag 
       ? notes.filter(n => n.tags.includes(activeTag))
       : notes;
 
-    const nodes: GraphNode[] = filteredNotes.map((n: any) => ({
+    const nodes: GraphNode[] = filteredNotes.map((n) => ({
       id: n.id,
       name: n.title,
-      val: Math.max(n.backlinks.length * 2, 4), // Size based on connections
+      val: Math.max((n.backlinks?.length || 0) * 2, 4),
       color: n.isPinned 
-        ? (isDarkMode ? '#818cf8' : '#6366f1') // Indigo for pinned
-        : (isDarkMode ? '#3f3f46' : '#e4e4e7'), // Zinc for normal
+        ? (isDarkMode ? '#818cf8' : '#6366f1') 
+        : (isDarkMode ? '#3f3f46' : '#e4e4e7'),
       fontColor: isDarkMode ? '#f4f4f5' : '#18181b',
     }));
 
     const links: GraphLink[] = [];
-    filteredNotes.forEach((note: any) => {
-      note.backlinks.forEach((linkTargetId: string) => {
-        // Only link if target node exists in current filtered set
+    filteredNotes.forEach((note) => {
+      (note.backlinks || []).forEach((linkTargetId: string) => {
         if (nodes.find(n => n.id === linkTargetId)) {
           links.push({
             source: note.id,
@@ -96,7 +147,7 @@ export const GraphPage = () => {
     });
 
     return { nodes, links };
-  }, [notes, isDarkMode, activeTag]);
+  }, [notes, isDarkMode, activeTag, remoteGraphData]);
 
   const handleNodeHover = (node: GraphNode | NodeObject | null) => {
     if (node) {
@@ -104,8 +155,7 @@ export const GraphPage = () => {
       const neighbors = new Set<string>();
       const neighborLinks = new Set<GraphLink>();
 
-      // Find all neighbors
-      graphData.links.forEach((link: any) => {
+      graphData.links.forEach((link) => {
         const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
         const targetId = typeof link.target === 'object' ? link.target.id : link.target;
         
@@ -165,17 +215,32 @@ export const GraphPage = () => {
                ))}
             </div>
           </div>
+          <button 
+            onClick={fetchGraphData}
+            disabled={isGraphLoading}
+            className="p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors disabled:opacity-50"
+          >
+            <RefreshCw size={16} className={cn(isGraphLoading && "animate-spin")} />
+          </button>
         </div>
 
         <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 rounded-lg p-1.5 shadow-lg pointer-events-auto flex flex-col gap-1">
           <button 
-            onClick={() => fgRef.current?.zoom(fgRef.current.zoom() * 1.2, 400)}
+            onClick={() => {
+              const instance = fgRef.current;
+              if (!instance) return;
+              instance.zoom(1.2, 400);
+            }}
             className="p-1.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
           >
             <ZoomIn size={18} />
           </button>
           <button 
-            onClick={() => fgRef.current?.zoom(fgRef.current.zoom() / 1.2, 400)}
+            onClick={() => {
+              const instance = fgRef.current;
+              if (!instance) return;
+              instance.zoom(0.8, 400);
+            }}
             className="p-1.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
           >
             <ZoomOut size={18} />
@@ -183,8 +248,20 @@ export const GraphPage = () => {
         </div>
       </div>
 
-      {/* Force Directed Graph Canvas */}
       <div className="flex-1 w-full relative" ref={setContainerRef}>
+        {isLoadingAny && (
+          <LoadingOverlay label="Mapping knowledge..." />
+        )}
+        {errorMessage && !isLoadingAny && (
+          <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none px-4">
+            <div className="pointer-events-auto">
+              <ErrorState
+                title="Unable to fully load graph data"
+                description={errorMessage}
+              />
+            </div>
+          </div>
+        )}
         {containerRef && (
           <ForceGraph2D
             ref={fgRef}
@@ -194,8 +271,8 @@ export const GraphPage = () => {
             nodeLabel="name"
             nodeColor="color"
             nodeRelSize={6}
-            linkWidth={(link: any) => highlightLinks.has(link) ? 3 : 1.5}
-            linkColor={(link: any) => highlightLinks.has(link) ? HIGHLIGHT_COLOR : isDarkMode ? '#52525b' : '#d4d4d8'}
+            linkWidth={(link: GraphLink) => highlightLinks.has(link) ? 3 : 1.5}
+            linkColor={(link: GraphLink) => highlightLinks.has(link) ? HIGHLIGHT_COLOR : isDarkMode ? '#52525b' : '#d4d4d8'}
             onNodeHover={handleNodeHover}
             onNodeClick={(node: GraphNode | NodeObject) => handleNodeClick(node as GraphNode)}
             nodeCanvasObject={(node: GraphNode | NodeObject, ctx: CanvasRenderingContext2D, globalScale: number) => {
@@ -206,12 +283,10 @@ export const GraphPage = () => {
               const fontSize = 12 / globalScale;
               ctx.font = `${fontSize}px Sans-Serif`;
               
-              // Handle dimming effect when hovering other nodes
               const isHovered = hoverNode === graphNode.id;
               const isNeighbor = highlightNodes.has(graphNode.id);
               const isFaded = hoverNode && !isHovered && !isNeighbor;
 
-              // Draw Node Circle
               ctx.beginPath();
               ctx.arc(graphNode.x, graphNode.y, graphNode.val, 0, 2 * Math.PI, false);
               
@@ -220,13 +295,12 @@ export const GraphPage = () => {
               } else if (isNeighbor) {
                 ctx.fillStyle = HIGHLIGHT_COLOR;
               } else if (isFaded) {
-                ctx.fillStyle = isDarkMode ? '#27272a' : '#f4f4f5'; // very faded
+                ctx.fillStyle = isDarkMode ? '#27272a' : '#f4f4f5';
               } else {
                 ctx.fillStyle = graphNode.color;
               }
               ctx.fill();
 
-              // Draw Label if hovered or highly connected
               if (!isFaded && (graphNode.val > 6 || isHovered || isNeighbor || globalScale > 1.5)) {
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -237,9 +311,9 @@ export const GraphPage = () => {
           />
         )}
       </div>
-
     </div>
   );
 };
 
 export default GraphPage;
+

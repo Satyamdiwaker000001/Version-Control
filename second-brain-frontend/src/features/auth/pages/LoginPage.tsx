@@ -29,8 +29,8 @@ export const LoginPage = () => {
       setAuth(response.user, response.token);
       toast.success('Successfully logged in');
       navigate('/');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to login');
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Failed to login');
     }
   };
 

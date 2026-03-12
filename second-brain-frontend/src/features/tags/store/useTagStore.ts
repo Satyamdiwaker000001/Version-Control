@@ -5,6 +5,7 @@ import { tagService } from '../services/tagService';
 export interface TagState {
   tags: Tag[];
   isLoading: boolean;
+  error: string | null;
   loadTags: () => Promise<void>;
   createTag: (name: string, color: string) => Promise<Tag>;
 }
@@ -12,15 +13,16 @@ export interface TagState {
 export const useTagStore = create<TagState>((set) => ({
   tags: [],
   isLoading: false,
+  error: null,
   
   loadTags: async () => {
-    set({ isLoading: true });
+    set({ isLoading: true, error: null });
     try {
       const tags = await tagService.getTags();
       set({ tags, isLoading: false });
-    } catch (error) {
-       console.error("Failed to load tags", error);
-       set({ isLoading: false });
+    } catch (error: unknown) {
+      console.error('Failed to load tags', error);
+      set({ isLoading: false, error: error instanceof Error ? error.message : 'Failed to load tags' });
     }
   },
 

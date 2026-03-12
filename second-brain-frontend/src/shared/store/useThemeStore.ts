@@ -4,54 +4,92 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 
 export interface ThemeState {
   themeMode: ThemeMode;
-  isDarkMode: boolean; // Resolved active theme
+  isDarkMode: boolean;
   setTheme: (mode: ThemeMode) => void;
+  toggleTheme: () => void;
   initializeTheme: () => void;
 }
 
-const getSystemTheme = () => window.matchMedia('(prefers-color-scheme: dark)').matches;
+const isBrowser = typeof window !== 'undefined';
+const isDocumentAvailable = typeof document !== 'undefined';
+
+const getSystemTheme = () => {
+  if (!isBrowser || typeof window.matchMedia !== 'function') {
+    return false;
+  }
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+};
+
+const getInitialThemeMode = (): ThemeMode => {
+  if (!isBrowser) {
+    return 'system';
+  }
+  const stored = window.localStorage.getItem('theme') as ThemeMode | null;
+  return stored ?? 'system';
+};
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
-  themeMode: (localStorage.getItem('theme') as ThemeMode) || 'system',
-  isDarkMode: false, // Will be computed on init
-  
+  themeMode: getInitialThemeMode(),
+  isDarkMode: false,
+
   setTheme: (mode) => {
-    localStorage.setItem('theme', mode);
-    
-    const isDark = mode === 'system' ? getSystemTheme() : mode === 'dark';
-    
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+    if (isBrowser) {
+      window.localStorage.setItem('theme', mode);
     }
-    
+
+    const isDark = mode === 'system' ? getSystemTheme() : mode === 'dark';
+
+    if (isDocumentAvailable) {
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+
     set({ themeMode: mode, isDarkMode: isDark });
   },
 
+  toggleTheme: () => {
+    const { isDarkMode } = get();
+    const nextMode: ThemeMode = isDarkMode ? 'light' : 'dark';
+    get().setTheme(nextMode);
+  },
+
   initializeTheme: () => {
-    const mode = get().themeMode;
-    const isDark = mode === 'system' ? getSystemTheme() : mode === 'dark';
-    
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+    const currentMode = get().themeMode;
+    const isDark = currentMode === 'system' ? getSystemTheme() : currentMode === 'dark';
+
+    if (isDocumentAvailable) {
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
     }
-    
+
     set({ isDarkMode: isDark });
 
-    // Setup system theme listener
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    if (!isBrowser || typeof window.matchMedia !== 'function') {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const listener = (e: MediaQueryListEvent) => {
       if (get().themeMode === 'system') {
         const newIsDark = e.matches;
-        if (newIsDark) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
+        if (isDocumentAvailable) {
+          if (newIsDark) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
         }
         set({ isDarkMode: newIsDark });
       }
-    });
-  }
+    };
+
+    mediaQuery.addEventListener('change', listener);
+  },
 }));
+
