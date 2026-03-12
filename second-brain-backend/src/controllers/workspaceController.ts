@@ -1,95 +1,243 @@
-import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-import { z } from 'zod';
-import { AuthRequest } from '../middlewares/authMiddleware';
-import { Octokit } from 'octokit';
+import { Request, Response } from "express";
+import { z } from "zod";
+import { workspaceService } from "../services/workspaceService";
+import { AppError } from "../types";
 
-const prisma = new PrismaClient();
+// Validation schemas
+const CreateWorkspaceSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  type: z.enum(["solo", "team"]),
+  description: z.string().optional(),
+});
 
-const linkWorkspaceSchema = z.object({
-  name: z.string().min(1),
-  githubOwner: z.string().min(1),
-  githubRepo: z.string().min(1),
-  githubAccessToken: z.string().min(1),
-  type: z.enum(['solo', 'team'])
+const UpdateWorkspaceSchema = z.object({
+  name: z.string().optional(),
+  description: z.string().optional(),
+  avatar: z.string().optional(),
+});
+
+const AddMemberSchema = z.object({
+  email: z.string().email("Invalid email"),
+  role: z.enum(["member", "admin"]).optional(),
 });
 
 export const workspaceController = {
-  createLinkedWorkspace: async (req: AuthRequest, res: Response) => {
+  // Create new workspace
+  createWorkspace: async (req: any, res: Response) => {
     try {
-      const userId = req.user?.id;
-      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const userId = req.userId;
+      const input = CreateWorkspaceSchema.parse(req.body);
 
-      const body = linkWorkspaceSchema.parse(req.body);
+      const workspace = await workspaceService.createWorkspace(userId, input);
 
-      // Verify if repo is already linked by this user maybe?
-      const existing = await prisma.workspace.findFirst({
-         where: { userId, githubOwner: body.githubOwner, githubRepo: body.githubRepo }
+      res.status(201).json({
+        success: true,
+        data: workspace,
       });
-
-      if (existing) {
-         return res.status(400).json({ error: 'Workspace already linked to this repository.' });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: "VALIDATION_ERROR",
+          details: error.errors,
+        });
       }
 
-      const workspace = await prisma.workspace.create({
-        data: {
-          name: body.name,
-          type: body.type,
-          githubOwner: body.githubOwner,
-          githubRepo: body.githubRepo,
-          githubAccessToken: body.githubAccessToken,
-          userId
-        }
-      });
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
 
-      res.status(201).json({ workspace });
-    } catch (e: any) {
-      res.status(400).json({ error: e.message });
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+      });
     }
   },
 
-  listMyWorkspaces: async (req: AuthRequest, res: Response) => {
-    try {
-      const userId = req.user?.id;
-      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-
-      const workspaces = await prisma.workspace.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' }
-      });
-
-      res.status(200).json({ workspaces });
-    } catch (e: any) {
-      res.status(500).json({ error: 'Server error' });
-    }
-  },
-
-  listCollaborators: async (req: AuthRequest, res: Response) => {
+  // Get workspace by ID
+  getWorkspace: async (req: any, res: Response) => {
     try {
       const { workspaceId } = req.params;
-      const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
+      const userId = req.userId;
 
-      if (!workspace || !workspace.githubAccessToken || !workspace.githubOwner || !workspace.githubRepo) {
-        return res.status(404).json({ error: 'Workspace config missing' });
+      const workspace = await workspaceService.getWorkspaceById(workspaceId, userId);
+
+      res.json({
+        success: true,
+        data: workspace,
+      });
+    } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
       }
 
-      const octokit = new Octokit({ auth: workspace.githubAccessToken });
-
-      const { data } = await octokit.rest.repos.listCollaborators({
-         owner: workspace.githubOwner,
-         repo: workspace.githubRepo
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
       });
-
-      const members = data.map((user: any) => ({
-         id: user.id.toString(),
-         name: user.login,
-         avatarUrl: user.avatar_url,
-         role: user.permissions?.admin ? 'owner' : (user.permissions?.push ? 'editor' : 'viewer'),
-      }));
-
-      res.status(200).json({ members });
-    } catch (e: any) {
-      res.status(e.status || 500).json({ error: e.message });
     }
-  }
+  },
+
+  // Get all user workspaces
+  listWorkspaces: async (req: any, res: Response) => {
+    try {
+      const userId = req.userId;
+      const workspaces = await workspaceService.getUserWorkspaces(userId);
+
+      res.json({
+        success: true,
+        data: workspaces,
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+      });
+    }
+  },
+
+  // Update workspace
+  updateWorkspace: async (req: any, res: Response) => {
+    try {
+      const { workspaceId } = req.params;
+      const userId = req.userId;
+      const input = UpdateWorkspaceSchema.parse(req.body);
+
+      const workspace = await workspaceService.updateWorkspace(workspaceId, userId, input);
+
+      res.json({
+        success: true,
+        data: workspace,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: "VALIDATION_ERROR",
+          details: error.errors,
+        });
+      }
+
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+      });
+    }
+  },
+
+  // Get workspace members
+  getMembers: async (req: any, res: Response) => {
+    try {
+      const { workspaceId } = req.params;
+      const userId = req.userId;
+
+      const members = await workspaceService.getMembers(workspaceId, userId);
+
+      res.json({
+        success: true,
+        data: members,
+      });
+    } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+      });
+    }
+  },
+
+  // Add member
+  addMember: async (req: any, res: Response) => {
+    try {
+      const { workspaceId } = req.params;
+      const userId = req.userId;
+      const { email, role } = AddMemberSchema.parse(req.body);
+
+      const member = await workspaceService.addMember(workspaceId, userId, email, role);
+
+      res.status(201).json({
+        success: true,
+        data: member,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: "VALIDATION_ERROR",
+          details: error.errors,
+        });
+      }
+
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+      });
+    }
+  },
+
+  // Remove member
+  removeMember: async (req: any, res: Response) => {
+    try {
+      const { workspaceId, memberId } = req.params;
+      const userId = req.userId;
+
+      await workspaceService.removeMember(workspaceId, userId, memberId);
+
+      res.json({
+        success: true,
+        message: "Member removed successfully",
+      });
+    } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+      });
+    }
+  },
 };

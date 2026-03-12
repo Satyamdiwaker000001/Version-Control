@@ -1,168 +1,252 @@
-import { Response } from 'express';
-import { AuthRequest } from '../middlewares/authMiddleware';
-import { PrismaClient } from '@prisma/client';
-import { Octokit } from 'octokit';
-import { z } from 'zod';
+import { Request, Response } from "express";
+import { z } from "zod";
+import { noteService } from "../services/noteService";
+import { AppError } from "../types";
 
-const prisma = new PrismaClient();
+const CreateNoteSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  content: z.string().min(1, "Content is required"),
+  description: z.string().optional(),
+  tagIds: z.array(z.string()).optional(),
+});
 
-const generateSlug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-
-const noteSchema = z.object({
-  title: z.string().min(1),
-  content: z.string()
+const UpdateNoteSchema = z.object({
+  title: z.string().optional(),
+  content: z.string().optional(),
+  description: z.string().optional(),
+  isPublic: z.boolean().optional(),
+  isPinned: z.boolean().optional(),
+  tagIds: z.array(z.string()).optional(),
 });
 
 export const noteController = {
-  // Returns all markdown notes in the `notes/` directory for the active workspace repo
-  listNotes: async (req: AuthRequest, res: Response) => {
-    try {
-      const workspaceId = req.params.workspaceId;
-      const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
-
-      if (!workspace || !workspace.githubAccessToken || !workspace.githubOwner || !workspace.githubRepo) {
-        return res.status(404).json({ error: 'Workspace or GitHub config not found' });
-      }
-
-      const octokit = new Octokit({ auth: workspace.githubAccessToken });
-
-      try {
-        const { data } = await octokit.rest.repos.getContent({
-          owner: workspace.githubOwner,
-          repo: workspace.githubRepo,
-          path: 'notes'
-        });
-
-        if (!Array.isArray(data)) {
-           return res.status(400).json({ error: 'Target path is not a directory' });
-        }
-
-        const notes = data.filter(file => file.name.endsWith('.md')).map(file => ({
-          name: file.name,
-          path: file.path,
-          sha: file.sha,
-          download_url: file.download_url
-        }));
-
-        res.json({ notes });
-      } catch (githubErr: any) {
-        if (githubErr.status === 404) {
-           return res.json({ notes: [] }); // Directory doesn't exist yet
-        }
-        throw githubErr;
-      }
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  },
-
-  // Reads a specific markdown file
-  getNote: async (req: AuthRequest, res: Response) => {
-    try {
-      const { workspaceId, slug } = req.params;
-      const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
-
-      if (!workspace || !workspace.githubAccessToken || !workspace.githubOwner || !workspace.githubRepo) {
-        return res.status(404).json({ error: 'Workspace or GitHub config not found' });
-      }
-
-      const octokit = new Octokit({ auth: workspace.githubAccessToken });
-      
-      const { data } = await octokit.rest.repos.getContent({
-         owner: workspace.githubOwner,
-         repo: workspace.githubRepo,
-         path: `notes/${slug}.md`
-      });
-
-      if (Array.isArray(data) || data.type !== 'file') {
-         return res.status(400).json({ error: 'Target is not a file' });
-      }
-
-      const content = Buffer.from(data.content, 'base64').toString('utf-8');
-
-      res.json({ 
-         sha: data.sha,
-         content,
-         name: data.name
-      });
-
-    } catch (e: any) {
-       res.status(e.status || 500).json({ error: e.message });
-    }
-  },
-
-  // Creates or updates a markdown file
-  saveNote: async (req: AuthRequest, res: Response) => {
+  // Create note
+  createNote: async (req: any, res: Response) => {
     try {
       const { workspaceId } = req.params;
-      const { title, content, sha } = req.body; // sha is required for updates
-      
-      if (!title) return res.status(400).json({ error: 'Title required' });
+      const userId = req.userId;
+      const input = CreateNoteSchema.parse(req.body);
 
-      const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
+      const note = await noteService.createNote(workspaceId, userId, input);
 
-      if (!workspace || !workspace.githubAccessToken || !workspace.githubOwner || !workspace.githubRepo) {
-        return res.status(404).json({ error: 'Workspace or GitHub config not found' });
+      res.status(201).json({
+        success: true,
+        data: note,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: "VALIDATION_ERROR",
+          details: error.errors,
+        });
       }
 
-      const slug = generateSlug(title);
-      const path = `notes/${slug}.md`;
-      const octokit = new Octokit({ auth: workspace.githubAccessToken });
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
 
-      const encodedContent = Buffer.from(content || '').toString('base64');
-
-      const user = req.user;
-      const message = sha ? `Update ${title}` : `Create ${title}`;
-
-      const { data } = await octokit.rest.repos.createOrUpdateFileContents({
-        owner: workspace.githubOwner,
-        repo: workspace.githubRepo,
-        path,
-        message: `${message}\n\nCo-authored-by: ${user?.email}`,
-        content: encodedContent,
-        sha: sha || undefined // Provide previous SHA if updating
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
       });
-
-      res.status(200).json({
-         message: 'Note saved successfully to GitHub',
-         commit: data.commit.sha,
-         contentSha: data.content?.sha
-      });
-
-    } catch (e: any) {
-       res.status(e.status || 500).json({ error: e.message });
     }
   },
 
-  // Gets commit history for a specific Markdown file
-  getHistory: async (req: AuthRequest, res: Response) => {
+  // Get note
+  getNote: async (req: any, res: Response) => {
     try {
-      const { workspaceId, slug } = req.params;
-      const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
+      const { noteId } = req.params;
+      const userId = req.userId;
 
-      if (!workspace || !workspace.githubAccessToken || !workspace.githubOwner || !workspace.githubRepo) {
-        return res.status(404).json({ error: 'Workspace config missing' });
+      const note = await noteService.getNoteById(noteId, userId);
+
+      res.json({
+        success: true,
+        data: note,
+      });
+    } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
       }
 
-      const octokit = new Octokit({ auth: workspace.githubAccessToken });
-      
-      const { data } = await octokit.rest.repos.listCommits({
-         owner: workspace.githubOwner,
-         repo: workspace.githubRepo,
-         path: `notes/${slug}.md`
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
       });
-
-      const history = data.map((commit: any) => ({
-         sha: commit.sha,
-         message: commit.commit.message,
-         author: commit.commit.author?.name || 'Unknown',
-         date: commit.commit.author?.date,
-         url: commit.html_url
-      }));
-
-      res.json({ history });
-    } catch (e: any) {
-      res.status(e.status || 500).json({ error: e.message });
     }
-  }
+  },
+
+  // List workspace notes
+  listNotes: async (req: any, res: Response) => {
+    try {
+      const { workspaceId } = req.params;
+      const userId = req.userId;
+      const page = parseInt(req.query.page) || 1;
+      const pageSize = parseInt(req.query.pageSize) || 20;
+      const tagId = req.query.tagId;
+
+      const result = await noteService.getWorkspaceNotes(
+        workspaceId,
+        userId,
+        page,
+        pageSize,
+        tagId
+      );
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+      });
+    }
+  },
+
+  // Update note
+  updateNote: async (req: any, res: Response) => {
+    try {
+      const { noteId } = req.params;
+      const userId = req.userId;
+      const input = UpdateNoteSchema.parse(req.body);
+
+      const note = await noteService.updateNote(noteId, userId, input);
+
+      res.json({
+        success: true,
+        data: note,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: "VALIDATION_ERROR",
+          details: error.errors,
+        });
+      }
+
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+      });
+    }
+  },
+
+  // Delete note
+  deleteNote: async (req: any, res: Response) => {
+    try {
+      const { noteId } = req.params;
+      const userId = req.userId;
+
+      await noteService.deleteNote(noteId, userId);
+
+      res.json({
+        success: true,
+        message: "Note deleted successfully",
+      });
+    } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+      });
+    }
+  },
+
+  // Get note versions
+  getVersions: async (req: any, res: Response) => {
+    try {
+      const { noteId } = req.params;
+      const userId = req.userId;
+
+      const versions = await noteService.getNoteVersions(noteId, userId);
+
+      res.json({
+        success: true,
+        data: versions,
+      });
+    } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+      });
+    }
+  },
+
+  // Restore version
+  restoreVersion: async (req: any, res: Response) => {
+    try {
+      const { noteId, versionId } = req.params;
+      const userId = req.userId;
+
+      const note = await noteService.restoreVersion(noteId, userId, versionId);
+
+      res.json({
+        success: true,
+        data: note,
+      });
+    } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+      });
+    }
+  },
 };

@@ -1,80 +1,183 @@
-import { Response } from 'express';
-import { AuthRequest } from '../middlewares/authMiddleware';
-import { PrismaClient } from '@prisma/client';
-import { Octokit } from 'octokit';
+import { Request, Response } from "express";
+import { z } from "zod";
+import { tagService } from "../services/tagService";
+import { AppError } from "../types";
 
-const prisma = new PrismaClient();
+const CreateTagSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  color: z.string().optional(),
+  emoji: z.string().optional(),
+  description: z.string().optional(),
+});
+
+const UpdateTagSchema = z.object({
+  name: z.string().optional(),
+  color: z.string().optional(),
+  emoji: z.string().optional(),
+  description: z.string().optional(),
+});
 
 export const taxonomyController = {
-  // Reads a JSON config file
-  getConfig: async (req: AuthRequest, res: Response) => {
+  // Create tag
+  createTag: async (req: any, res: Response) => {
     try {
-      const { workspaceId, type } = req.params; // type: 'tags' | 'graph'
-      const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
+      const { workspaceId } = req.params;
+      const userId = req.userId;
+      const input = CreateTagSchema.parse(req.body);
 
-      if (!workspace || !workspace.githubAccessToken || !workspace.githubOwner || !workspace.githubRepo) {
-        return res.status(404).json({ error: 'Workspace config missing' });
-      }
+      const tag = await tagService.createTag(workspaceId, userId, input);
 
-      const octokit = new Octokit({ auth: workspace.githubAccessToken });
-      const path = type === 'tags' ? 'tags/tags.json' : 'graph/relations.json';
-
-      try {
-        const { data } = await octokit.rest.repos.getContent({
-          owner: workspace.githubOwner,
-          repo: workspace.githubRepo,
-          path
+      res.status(201).json({
+        success: true,
+        data: tag,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: "VALIDATION_ERROR",
+          details: error.errors,
         });
-
-        if (Array.isArray(data) || data.type !== 'file') {
-           return res.status(400).json({ error: 'Configuration is not a valid JSON file' });
-        }
-
-        const content = Buffer.from(data.content, 'base64').toString('utf-8');
-        res.json({ data: JSON.parse(content), sha: data.sha });
-      } catch (githubErr: any) {
-        if (githubErr.status === 404) {
-           return res.json({ data: type === 'tags' ? [] : { nodes: [], links: [] }, sha: null });
-        }
-        throw githubErr;
       }
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
+
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+      });
     }
   },
 
-  // Updates a JSON config file
-  updateConfig: async (req: AuthRequest, res: Response) => {
+  // Get tag
+  getTag: async (req: any, res: Response) => {
     try {
-      const { workspaceId, type } = req.params;
-      const { payload, sha } = req.body;
-      const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } });
+      const { tagId } = req.params;
+      const userId = req.userId;
 
-      if (!workspace || !workspace.githubAccessToken || !workspace.githubOwner || !workspace.githubRepo) {
-        return res.status(404).json({ error: 'Workspace config missing' });
+      const tag = await tagService.getTagById(tagId, userId);
+
+      res.json({
+        success: true,
+        data: tag,
+      });
+    } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
       }
 
-      const path = type === 'tags' ? 'tags/tags.json' : 'graph/relations.json';
-      const octokit = new Octokit({ auth: workspace.githubAccessToken });
-      const encodedContent = Buffer.from(JSON.stringify(payload, null, 2)).toString('base64');
-      const user = req.user;
-
-      const { data } = await octokit.rest.repos.createOrUpdateFileContents({
-        owner: workspace.githubOwner,
-        repo: workspace.githubRepo,
-        path,
-        message: `Update ${type} taxonomy\n\nCo-authored-by: ${user?.email}`,
-        content: encodedContent,
-        sha: sha || undefined
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
       });
-
-      res.status(200).json({
-         message: `${type} updated successfully`,
-         commit: data.commit.sha,
-         contentSha: data.content?.sha
-      });
-    } catch (e: any) {
-      res.status(e.status || 500).json({ error: e.message });
     }
-  }
+  },
+
+  // List tags
+  listTags: async (req: any, res: Response) => {
+    try {
+      const { workspaceId } = req.params;
+      const userId = req.userId;
+
+      const tags = await tagService.getWorkspaceTags(workspaceId, userId);
+
+      res.json({
+        success: true,
+        data: tags,
+      });
+    } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+      });
+    }
+  },
+
+  // Update tag
+  updateTag: async (req: any, res: Response) => {
+    try {
+      const { tagId } = req.params;
+      const userId = req.userId;
+      const input = UpdateTagSchema.parse(req.body);
+
+      const tag = await tagService.updateTag(tagId, userId, input);
+
+      res.json({
+        success: true,
+        data: tag,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: "VALIDATION_ERROR",
+          details: error.errors,
+        });
+      }
+
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+      });
+    }
+  },
+
+  // Delete tag
+  deleteTag: async (req: any, res: Response) => {
+    try {
+      const { tagId } = req.params;
+      const userId = req.userId;
+
+      await tagService.deleteTag(tagId, userId);
+
+      res.json({
+        success: true,
+        message: "Tag deleted successfully",
+      });
+    } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+      });
+    }
+  },
 };

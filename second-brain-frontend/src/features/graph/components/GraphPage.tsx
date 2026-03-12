@@ -6,9 +6,11 @@ import type { NoteState } from '@/features/notes/store/useNoteStore';
 import { useThemeStore } from '@/shared/store/useThemeStore';
 import type { ThemeState } from '@/shared/store/useThemeStore';
 import { useTagStore } from '@/features/tags/store/useTagStore';
-import { Network, ZoomIn, ZoomOut, Filter, Tag as TagIcon } from 'lucide-react';
+import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
+import { Network, ZoomIn, ZoomOut, Filter, MousePointer2, Focus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/shared/utils/cn';
+import { Button } from '@/shared/ui/Button';
 
 interface GraphNode {
   id: string;
@@ -16,6 +18,7 @@ interface GraphNode {
   val: number;
   color: string;
   fontColor: string;
+  isPinned: boolean;
   x?: number;
   y?: number;
 }
@@ -26,12 +29,10 @@ interface GraphLink {
   color: string;
 }
 
-const HIGHLIGHT_COLOR = '#8b5cf6'; // Violet
-const HIGHLIGHT_NODE_COLOR = '#a78bfa'; // Lighter violet
-
 export const GraphPage = () => {
   const notes = useNoteStore((state: NoteState) => state.notes);
   const isDarkMode = useThemeStore((state: ThemeState) => state.isDarkMode);
+  const activeWorkspace = useWorkspaceStore(state => state.activeWorkspace);
   const navigate = useNavigate();
   const fgRef = useRef<any>(null);
   const [containerRef, setContainerRef] = useState<HTMLDivElement | null>(null);
@@ -42,7 +43,6 @@ export const GraphPage = () => {
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [hoverNode, setHoverNode] = useState<string | null>(null);
   
-  // Track neighbors for highlight effect
   const [highlightNodes, setHighlightNodes] = useState(new Set<string>());
   const [highlightLinks, setHighlightLinks] = useState(new Set<GraphLink>());
   
@@ -64,39 +64,37 @@ export const GraphPage = () => {
     }
   }, [containerRef]);
 
-  // Transform notes into Graph Data
+  // Transform notes into Graph Data with Workspace Filtering
   const graphData = useMemo(() => {
-    // 1. Filter nodes based on active tag
+    const workspaceNotes = notes.filter(n => n.workspaceId === activeWorkspace?.id);
     const filteredNotes = activeTag 
-      ? notes.filter(n => n.tags.includes(activeTag))
-      : notes;
+      ? workspaceNotes.filter(n => n.tags.includes(activeTag))
+      : workspaceNotes;
 
     const nodes: GraphNode[] = filteredNotes.map((n: any) => ({
       id: n.id,
       name: n.title,
-      val: Math.max(n.backlinks.length * 2, 4), // Size based on connections
-      color: n.isPinned 
-        ? (isDarkMode ? '#818cf8' : '#6366f1') // Indigo for pinned
-        : (isDarkMode ? '#3f3f46' : '#e4e4e7'), // Zinc for normal
-      fontColor: isDarkMode ? '#f4f4f5' : '#18181b',
+      val: Math.max((n.backlinks?.length || 0) * 3, 6),
+      isPinned: !!n.isPinned,
+      color: n.isPinned ? '#8b5cf6' : (isDarkMode ? '#3f3f46' : '#e4e4e7'),
+      fontColor: isDarkMode ? '#a1a1aa' : '#71717a',
     }));
 
     const links: GraphLink[] = [];
     filteredNotes.forEach((note: any) => {
-      note.backlinks.forEach((linkTargetId: string) => {
-        // Only link if target node exists in current filtered set
+      note.backlinks?.forEach((linkTargetId: string) => {
         if (nodes.find(n => n.id === linkTargetId)) {
           links.push({
             source: note.id,
             target: linkTargetId,
-            color: isDarkMode ? '#52525b' : '#d4d4d8'
+            color: isDarkMode ? '#27272a' : '#f4f4f5'
           });
         }
       });
     });
 
     return { nodes, links };
-  }, [notes, isDarkMode, activeTag]);
+  }, [notes, isDarkMode, activeTag, activeWorkspace]);
 
   const handleNodeHover = (node: GraphNode | NodeObject | null) => {
     if (node) {
@@ -104,7 +102,6 @@ export const GraphPage = () => {
       const neighbors = new Set<string>();
       const neighborLinks = new Set<GraphLink>();
 
-      // Find all neighbors
       graphData.links.forEach((link: any) => {
         const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
         const targetId = typeof link.target === 'object' ? link.target.id : link.target;
@@ -128,63 +125,68 @@ export const GraphPage = () => {
     }
   };
 
-  const handleNodeClick = (node: GraphNode) => {
-    navigate(`/editor?noteId=${node.id}`);
-  };
-
   return (
-    <div className="flex flex-col h-full bg-zinc-50 dark:bg-zinc-950 animate-in fade-in slide-in-from-bottom-4 duration-500 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden relative">
+    <div className="flex flex-col h-full bg-background animate-in fade-in duration-700 relative overflow-hidden">
       
-      {/* Search & Filter Top Bar */}
-      <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between pointer-events-none">
-        <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 rounded-lg p-3 shadow-lg pointer-events-auto flex items-center gap-4">
-          <div className="flex items-center gap-2 text-zinc-900 dark:text-zinc-100 font-semibold">
-            <Network size={18} className="text-indigo-500" /> Knowledge Graph
-          </div>
-          <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700"></div>
-          <div className="flex gap-2 relative group">
-            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
-              <Filter size={14} /> {activeTag ? `Tag: ${activeTag}` : 'Filter Tags'}
-            </button>
-            <div className="absolute top-full mt-2 right-0 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all pointer-events-none group-hover:pointer-events-auto p-2 flex flex-col gap-1 max-h-64 overflow-y-auto z-50">
-               <button 
-                 onClick={() => setActiveTag(null)}
-                 className={cn("text-left px-3 py-1.5 text-xs rounded-md transition-colors", !activeTag ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 font-medium" : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800")}
-               >
-                 All Tags
-               </button>
-               {tags.map(t => (
-                 <button 
-                   key={t.id}
-                   onClick={() => setActiveTag(t.name)}
-                   className={cn("text-left px-3 py-1.5 text-xs flex items-center gap-2 rounded-md transition-colors", activeTag === t.name ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 font-medium" : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800")}
-                 >
-                   <TagIcon size={12} className={activeTag === t.name ? "text-indigo-500" : "text-zinc-400"} />
-                   <span className="truncate">{t.name}</span>
-                 </button>
-               ))}
+      {/* Premium Search & Control Interface */}
+      <div className="absolute top-6 left-6 right-6 z-20 flex items-start justify-between pointer-events-none">
+        <div className="flex flex-col gap-4 pointer-events-auto">
+          <div className="glass border border-border rounded-2xl p-4 shadow-2xl flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                <Network size={22} />
+              </div>
+              <div className="flex flex-col">
+                <h1 className="text-sm font-extrabold tracking-tight text-foreground uppercase">Neural Graph</h1>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{activeWorkspace?.name || 'Local'}</span>
+              </div>
             </div>
+            <div className="h-8 w-px bg-border"></div>
+            <div className="flex items-center gap-2">
+               <Button variant="ghost" size="sm" className="h-9 gap-2 text-xs font-bold text-muted-foreground hover:text-foreground group">
+                  <Filter size={14} /> <span>{activeTag || 'ALL NODES'}</span>
+               </Button>
+               <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground group">
+                  <MousePointer2 size={16} />
+               </Button>
+            </div>
+          </div>
+          
+          {/* Active Tag Pills */}
+          <div className="flex flex-wrap gap-2 max-w-sm">
+             {tags.slice(0, 5).map(tag => (
+                <button 
+                  key={tag.id}
+                  onClick={() => setActiveTag(activeTag === tag.name ? null : tag.name)}
+                  className={cn(
+                    "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-all",
+                    activeTag === tag.name 
+                      ? "bg-primary text-primary-foreground border-primary" 
+                      : "bg-accent/50 text-muted-foreground border-border hover:border-primary/50"
+                  )}
+                >
+                  #{tag.name}
+                </button>
+             ))}
           </div>
         </div>
 
-        <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md border border-zinc-200 dark:border-zinc-800 rounded-lg p-1.5 shadow-lg pointer-events-auto flex flex-col gap-1">
-          <button 
-            onClick={() => fgRef.current?.zoom(fgRef.current.zoom() * 1.2, 400)}
-            className="p-1.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
-          >
+        <div className="glass border border-border rounded-2xl p-1.5 shadow-2xl pointer-events-auto flex flex-col gap-1">
+          <Button variant="ghost" size="icon" onClick={() => fgRef.current?.zoom(fgRef.current.zoom() * 1.5, 400)} className="h-10 w-10 text-muted-foreground">
             <ZoomIn size={18} />
-          </button>
-          <button 
-            onClick={() => fgRef.current?.zoom(fgRef.current.zoom() / 1.2, 400)}
-            className="p-1.5 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
-          >
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => fgRef.current?.zoom(fgRef.current.zoom() / 1.5, 400)} className="h-10 w-10 text-muted-foreground">
             <ZoomOut size={18} />
-          </button>
+          </Button>
+          <div className="h-px w-6 bg-border mx-auto my-1"></div>
+          <Button variant="ghost" size="icon" onClick={() => fgRef.current?.centerAt(0, 0, 400)} className="h-10 w-10 text-muted-foreground">
+            <Focus size={18} />
+          </Button>
         </div>
       </div>
 
       {/* Force Directed Graph Canvas */}
-      <div className="flex-1 w-full relative" ref={setContainerRef}>
+      <div className="flex-1 w-full h-full relative" ref={setContainerRef}>
         {containerRef && (
           <ForceGraph2D
             ref={fgRef}
@@ -193,49 +195,70 @@ export const GraphPage = () => {
             graphData={graphData}
             nodeLabel="name"
             nodeColor="color"
-            nodeRelSize={6}
-            linkWidth={(link: any) => highlightLinks.has(link) ? 3 : 1.5}
-            linkColor={(link: any) => highlightLinks.has(link) ? HIGHLIGHT_COLOR : isDarkMode ? '#52525b' : '#d4d4d8'}
+            nodeRelSize={2}
+            linkWidth={(link: any) => highlightLinks.has(link) ? 2 : 1}
+            linkColor={(link: any) => highlightLinks.has(link) ? '#8b5cf6' : isDarkMode ? '#27272a' : '#f1f1f1'}
             onNodeHover={handleNodeHover}
-            onNodeClick={(node: GraphNode | NodeObject) => handleNodeClick(node as GraphNode)}
-            nodeCanvasObject={(node: GraphNode | NodeObject, ctx: CanvasRenderingContext2D, globalScale: number) => {
-              const graphNode = node as GraphNode;
-              if (graphNode.x === undefined || graphNode.y === undefined) return;
-              
-              const label = graphNode.name;
+            onNodeClick={(node: any) => navigate(`/editor?noteId=${node.id}`)}
+            cooldownTicks={100}
+            d3AlphaDecay={0.02}
+            d3VelocityDecay={0.3}
+            nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
+              const label = node.name;
               const fontSize = 12 / globalScale;
-              ctx.font = `${fontSize}px Sans-Serif`;
               
-              // Handle dimming effect when hovering other nodes
-              const isHovered = hoverNode === graphNode.id;
-              const isNeighbor = highlightNodes.has(graphNode.id);
+              const isHovered = hoverNode === node.id;
+              const isNeighbor = highlightNodes.has(node.id);
               const isFaded = hoverNode && !isHovered && !isNeighbor;
 
-              // Draw Node Circle
+              // Draw Pulse Effect for Pinned/Highlighted
+              if ((node.isPinned || isHovered) && !isFaded) {
+                const time = Date.now() / 1000;
+                const pulse = Math.sin(time * 3) * 0.5 + 0.5;
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, node.val + (2 + pulse * 4) / globalScale, 0, 2 * Math.PI, false);
+                ctx.fillStyle = isHovered ? 'rgba(139, 92, 246, 0.15)' : 'rgba(139, 92, 246, 0.08)';
+                ctx.fill();
+              }
+
+              // Draw Node
               ctx.beginPath();
-              ctx.arc(graphNode.x, graphNode.y, graphNode.val, 0, 2 * Math.PI, false);
+              ctx.arc(node.x, node.y, node.val, 0, 2 * Math.PI, false);
               
               if (isHovered) {
-                ctx.fillStyle = HIGHLIGHT_NODE_COLOR;
+                ctx.fillStyle = '#8b5cf6';
               } else if (isNeighbor) {
-                ctx.fillStyle = HIGHLIGHT_COLOR;
+                ctx.fillStyle = '#a78bfa';
               } else if (isFaded) {
-                ctx.fillStyle = isDarkMode ? '#27272a' : '#f4f4f5'; // very faded
+                ctx.fillStyle = isDarkMode ? '#18181b' : '#fafafa';
               } else {
-                ctx.fillStyle = graphNode.color;
+                ctx.fillStyle = node.color;
               }
               ctx.fill();
 
-              // Draw Label if hovered or highly connected
-              if (!isFaded && (graphNode.val > 6 || isHovered || isNeighbor || globalScale > 1.5)) {
+              // Draw Border
+              ctx.strokeStyle = isHovered || isNeighbor ? '#8b5cf6' : (isDarkMode ? '#27272a' : '#e4e4e7');
+              ctx.lineWidth = 1 / globalScale;
+              ctx.stroke();
+
+              // Draw Label
+              if (!isFaded && (globalScale > 1.2 || isHovered || isNeighbor)) {
+                ctx.font = `${isHovered || isNeighbor ? 'bold' : 'normal'} ${fontSize}px sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillStyle = isHovered || isNeighbor ? (isDarkMode ? '#ffffff' : '#000000') : graphNode.fontColor;
-                ctx.fillText(label, graphNode.x, graphNode.y + graphNode.val + (fontSize * 1.2));
+                ctx.fillStyle = isHovered || isNeighbor ? (isDarkMode ? '#ffffff' : '#000000') : node.fontColor;
+                ctx.fillText(label, node.x, node.y + node.val + (fontSize * 1.5));
               }
             }}
           />
         )}
+      </div>
+
+      {/* Legend / Stats Footer */}
+      <div className="absolute bottom-6 left-6 z-20 glass border border-border rounded-xl px-4 py-2 shadow-xl flex items-center gap-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+         <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_rgba(139,92,246,0.5)]"></div> PINNED</div>
+         <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-border"></div> STANDARD</div>
+         <div className="flex items-center gap-1.5 text-foreground/80"><Network size={12} /> {graphData.nodes.length} NODES</div>
       </div>
 
     </div>

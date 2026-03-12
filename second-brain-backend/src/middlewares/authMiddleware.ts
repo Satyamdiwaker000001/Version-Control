@@ -1,9 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+import { authService } from '../services/authService';
 
 export interface AuthRequest extends Request {
+  userId?: string;
   user?: {
     id: string;
     email: string;
@@ -11,19 +10,26 @@ export interface AuthRequest extends Request {
 }
 
 export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
 
-  if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
-  }
-
-  jwt.verify(token, JWT_SECRET, (err, user: any) => {
-    if (err) {
-      return res.status(403).json({ error: 'Invalid or expired token' });
+    if (!token) {
+      return res.status(401).json({ 
+        success: false,
+        error: 'Access token required' 
+      });
     }
+
+    const payload = authService.verifyToken(token);
+    req.userId = payload.userId;
+    req.user = payload;
     
-    req.user = user;
     next();
-  });
+  } catch (error: any) {
+    res.status(401).json({ 
+      success: false,
+      error: error.message || 'Invalid or expired token' 
+    });
+  }
 };

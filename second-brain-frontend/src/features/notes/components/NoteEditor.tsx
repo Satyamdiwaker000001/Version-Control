@@ -1,123 +1,187 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNoteStore } from '@/features/notes/store/useNoteStore';
-import { Save, GitCommit, Settings2, PlaySquare } from 'lucide-react';
+import { Save, GitCommit, PlaySquare, MoreHorizontal, Share2, Clock, Lock, Sparkles, Plus, Users } from 'lucide-react';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from '@/shared/ui/Button';
 
 export const NoteEditor = ({ noteId }: { noteId: string }) => {
   const note = useNoteStore(state => state.notes.find(n => n.id === noteId));
   const updateNote = useNoteStore(state => state.updateNote);
   
   const [content, setContent] = useState('');
+  const [title, setTitle] = useState('');
   const [commitMessage, setCommitMessage] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Sync state when active note changes
   useEffect(() => {
     if (note) {
       setContent(note.content);
+      setTitle(note.title);
     } else {
       setContent('');
+      setTitle('');
     }
   }, [note]);
 
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [content]);
+
   if (!note) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-white dark:bg-zinc-950 text-zinc-500">
-        <PlaySquare size={48} className="text-zinc-200 dark:text-zinc-800 mb-4" />
-        <p>Select a note from the explorer to view its contents.</p>
+      <div className="flex-1 flex flex-col items-center justify-center bg-background text-muted-foreground animate-in fade-in duration-500">
+        <div className="w-20 h-20 rounded-3xl bg-accent flex items-center justify-center mb-6">
+          <PlaySquare size={32} className="text-primary opacity-20" />
+        </div>
+        <p className="text-sm font-medium">Select a note from the explorer to view its contents.</p>
+        <p className="text-xs opacity-50 mt-1">Or press <kbd className="font-sans px-1.5 py-0.5 rounded border border-border bg-muted">⌘+K</kbd> to search</p>
       </div>
     );
   }
 
   const handleSave = () => {
-    if (content === note.content) return; // No changes
+    if (content === note.content && title === note.title) return;
     setIsCommitting(true);
   };
 
   const confirmCommit = () => {
     updateNote(note.id, content, commitMessage || 'Update content', 'mockUserId');
-    toast.success('Version committed to history', {
-      description: `Commit "${commitMessage || 'Update content'}" created successfully.`
-    });
+    toast.success('Version saved');
     setIsCommitting(false);
     setCommitMessage('');
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-white dark:bg-zinc-950 relative overflow-hidden">
+    <div className="flex-1 flex flex-col bg-background relative overflow-hidden h-full">
       
-      {/* Editor Top Bar */}
-      <div className="h-14 flex items-center justify-between px-6 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 z-10">
-        <div className="flex items-center gap-3">
-          <input 
-            type="text" 
-            defaultValue={note.title}
-            className="text-lg font-bold text-zinc-900 dark:text-white bg-transparent border-none focus:outline-none focus:ring-0 w-[400px] truncate"
-          />
+      {/* Notion-style Minimal Top Bar */}
+      <div className="h-12 flex items-center justify-between px-4 shrink-0 z-20">
+        <div className="flex items-center gap-1 text-[13px] text-muted-foreground font-medium">
+          <span className="hover:bg-accent px-2 py-1 rounded cursor-pointer transition-colors">Workspace</span>
+          <span className="opacity-40">/</span>
+          <span className="hover:bg-accent px-2 py-1 rounded cursor-pointer transition-colors max-w-[150px] truncate">{title}</span>
         </div>
         
-        <div className="flex items-center gap-2">
-          {content !== note.content && (
-            <span className="text-xs font-medium text-amber-500 bg-amber-50 dark:bg-amber-950/30 px-2 py-1 rounded-md animate-pulse">
-              Unsaved changes
-            </span>
-          )}
-          <button 
-            className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
-            title="Editor Settings"
-          >
-            <Settings2 size={16} />
-          </button>
-          <button 
+        <div className="flex items-center gap-1">
+          <div className="flex items-center mr-2">
+             <span className="text-[10px] items-center gap-1 font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full hidden sm:flex">
+                <Clock size={10} /> SAVED
+             </span>
+          </div>
+          <Button variant="ghost" size="sm" className="h-8 gap-2 text-muted-foreground">
+            <Share2 size={14} /> <span className="hidden md:inline">Share</span>
+          </Button>
+          <Button variant="ghost" size="sm" className="h-8 text-muted-foreground">
+            <Sparkles size={14} className="text-primary" />
+          </Button>
+          <div className="w-px h-4 bg-border mx-1"></div>
+          <Button 
+            variant={content !== note.content || title !== note.title ? "default" : "ghost"}
+            size="sm" 
             onClick={handleSave}
-            disabled={content === note.content}
-            className="ml-2 flex items-center gap-2 px-3 py-1.5 bg-indigo-600 disabled:bg-indigo-300 disabled:cursor-not-allowed hover:bg-indigo-500 text-white text-sm font-medium rounded-md shadow-sm transition-colors"
+            disabled={content === note.content && title === note.title}
+            className="h-8 gap-2"
           >
             <Save size={14} /> Commit
-          </button>
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+            <MoreHorizontal size={16} />
+          </Button>
         </div>
       </div>
 
-      {/* Commit Message Flyout */}
-      {isCommitting && (
-        <div className="absolute top-14 right-6 w-80 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 shadow-xl rounded-b-lg p-4 z-20 animate-in slide-in-from-top-2">
-          <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-zinc-900 dark:text-white">
-            <GitCommit size={16} className="text-indigo-500" /> New Version Commit
+      {/* Editor Content Area */}
+      <div className="flex-1 overflow-y-auto w-full custom-scrollbar">
+        <div className="max-w-3xl mx-auto px-6 sm:px-12 py-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          
+          {/* Note Metadata / Status Icon */}
+          <div className="mb-4 flex items-center gap-4 text-muted-foreground opacity-50 group">
+             <div className="w-12 h-12 rounded-xl border-2 border-dashed border-border flex items-center justify-center hover:border-primary/50 hover:bg-accent transition-all cursor-pointer">
+                <Plus size={20} />
+             </div>
+             <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-widest">Add icon or cover</span>
+             </div>
           </div>
+
+          {/* Title Input */}
           <textarea
-            autoFocus
-            value={commitMessage}
-            onChange={(e) => setCommitMessage(e.target.value)}
-            placeholder="Describe your changes..."
-            className="w-full text-sm p-3 border border-zinc-200 dark:border-zinc-700 rounded-md bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400 focus:ring-indigo-500 focus:border-indigo-500"
-            rows={3}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            rows={1}
+            placeholder="Untitled"
+            className="w-full text-4xl sm:text-5xl font-extrabold text-foreground bg-transparent border-none focus:ring-0 resize-none outline-none mb-4 placeholder:opacity-20 leading-tight"
+            style={{ minHeight: '1.2em' }}
           />
-          <div className="flex justify-end gap-2 mt-3">
-            <button 
-              onClick={() => setIsCommitting(false)}
-              className="px-3 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
-            >
-              Cancel
-            </button>
-            <button 
-              onClick={confirmCommit}
-              className="px-3 py-1.5 text-xs font-medium bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-zinc-100 rounded-md transition-colors shadow-sm"
-            >
-              Save Version
-            </button>
-          </div>
-        </div>
-      )}
 
-      {/* Markdown Text Area */}
-      <div className="flex-1 overflow-y-auto w-full p-8 sm:px-16 lg:px-24">
-        <textarea 
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          className="w-full min-h-full resize-none text-zinc-800 dark:text-zinc-300 bg-transparent border-none focus:ring-0 leading-relaxed font-mono text-sm sm:text-base outline-none"
-          placeholder="Start typing your knowledge document..."
-        />
+          <div className="flex items-center gap-4 mb-8 text-sm text-muted-foreground/60 border-b border-border/50 pb-4">
+             <div className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-accent cursor-pointer transition-colors">
+                <Users size={14} /> <span>3 collaborators</span>
+             </div>
+             <div className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-accent cursor-pointer transition-colors">
+                <Lock size={14} /> <span>Private to Workspace</span>
+             </div>
+          </div>
+
+          {/* Body Content */}
+          <textarea 
+            ref={textareaRef}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            className="w-full min-h-[400px] resize-none text-foreground bg-transparent border-none focus:ring-0 leading-relaxed text-base sm:text-lg outline-none placeholder:opacity-20 pb-40"
+            placeholder="Press '/' for commands..."
+          />
+        </div>
       </div>
+
+      {/* Commit Overlay */}
+      <AnimatePresence>
+        {isCommitting && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-background/20 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-md bg-card border border-border shadow-2xl rounded-2xl overflow-hidden"
+            >
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                    <GitCommit size={20} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg">Save new version</h3>
+                    <p className="text-xs text-muted-foreground">Documenting history to GitHub repository</p>
+                  </div>
+                </div>
+                
+                <textarea
+                  autoFocus
+                  value={commitMessage}
+                  onChange={(e) => setCommitMessage(e.target.value)}
+                  placeholder="What changed in this version?"
+                  className="w-full h-24 p-4 rounded-xl bg-accent/50 border border-border text-sm focus:ring-2 focus:ring-primary/20 outline-none resize-none"
+                />
+                
+                <div className="flex gap-3 mt-6">
+                  <Button variant="ghost" className="flex-1" onClick={() => setIsCommitting(false)}>
+                    Discard changes
+                  </Button>
+                  <Button className="flex-1 premium-shadow" onClick={confirmCommit}>
+                    Save to History
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       
     </div>
   );

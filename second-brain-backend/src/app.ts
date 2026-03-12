@@ -5,6 +5,7 @@ import workspaceRoutes from './routes/workspaceRoutes';
 import githubRoutes from './routes/githubRoutes';
 import noteRoutes from './routes/noteRoutes';
 import taxonomyRoutes from './routes/taxonomyRoutes';
+import chatRoutes from './routes/chatRoutes';
 
 const app: Express = express();
 
@@ -26,11 +27,16 @@ app.use('/api/workspaces', workspaceRoutes);
 app.use('/api/github', githubRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/taxonomy', taxonomyRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Global Error Handler
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error(err.stack);
-  res.status(500).json({ error: 'Internal Server Error', message: err.message });
+  res.status(500).json({ 
+    success: false,
+    error: 'Internal Server Error', 
+    message: err.message 
+  });
 });
 
 export default app;

@@ -1,4 +1,16 @@
-import { Home, FileText, Hash, Share2, Settings, LogOut, Github } from 'lucide-react';
+import { 
+  Home, 
+  FileText, 
+  Settings, 
+  Github, 
+  LogOut, 
+  Hash, 
+  Share2,
+  Kanban,
+  Network,
+  ChevronDown,
+  Plus,
+} from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/shared/utils/cn';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
@@ -6,177 +18,170 @@ import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore'
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const navItems = [
-  { name: 'Dashboard', path: '/', icon: Home },
-  { name: 'All Notes', path: '/editor', icon: FileText },
-  { name: 'Tags', path: '/tags', icon: Hash },
-  { name: 'Graph View', path: '/graph', icon: Share2 },
-  { name: 'GitHub Integration', path: '/github', icon: Github },
-  { name: 'Settings', path: '/settings', icon: Settings },
+const NAV_SECTIONS = [
+  {
+    label: 'Main',
+    items: [
+      { name: 'Dashboard', path: '/', icon: Home },
+      { name: 'All Notes', path: '/editor', icon: FileText },
+      { name: 'Tags', path: '/tags', icon: Hash },
+      { name: 'Knowledge Graph', path: '/graph', icon: Share2 },
+      { name: 'Projects', path: '/projects', icon: Kanban },
+    ],
+  },
+  {
+    label: 'Integrations',
+    items: [
+      { name: 'GitHub', path: '/github', icon: Github },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { name: 'Settings', path: '/settings', icon: Settings },
+    ],
+  },
 ];
 
 export const Sidebar = () => {
   const location = useLocation();
   const logout = useAuthStore((state) => state.logout);
-
-  const { workspaces, activeWorkspace, setActiveWorkspace } = useWorkspaceStore();
+  const { workspaces, activeWorkspace, selectWorkspace } = useWorkspaceStore();
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
 
+  const NavLink = ({ item }: { item: { name: string; path: string; icon: any } }) => {
+    const Icon = item.icon;
+    const isActive = location.pathname === item.path || 
+      (item.path !== '/' && location.pathname.startsWith(item.path));
+    return (
+      <Link
+        to={item.path}
+        className={cn(
+          'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group',
+          isActive
+            ? 'bg-primary/10 text-primary'
+            : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+        )}
+      >
+        <Icon
+          size={17}
+          className={cn(
+            'shrink-0 transition-colors',
+            isActive ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground'
+          )}
+        />
+        <span className="truncate">{item.name}</span>
+        {isActive && (
+          <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+        )}
+      </Link>
+    );
+  };
+
   return (
-    <aside className="w-64 bg-zinc-900 dark:bg-zinc-950 border-r border-zinc-800 flex flex-col transition-colors absolute sm:relative z-40 h-full">
+    <aside className="w-64 bg-card border-r border-border flex flex-col h-full shrink-0">
       
       {/* Workspace Switcher */}
-      <div className="p-4 border-b border-zinc-800">
-        <div 
-          className="flex items-center justify-between p-2 hover:bg-zinc-800 rounded-lg cursor-pointer transition-colors group relative"
+      <div className="p-4 border-b border-border relative">
+        <button
+          className="w-full flex items-center justify-between p-2.5 hover:bg-accent rounded-xl cursor-pointer transition-all group border border-transparent hover:border-border"
           onClick={() => setIsWorkspaceOpen(!isWorkspaceOpen)}
         >
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-8 h-8 rounded bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shrink-0 shadow-inner">
-              {activeWorkspace?.name.charAt(0) || 'W'}
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold shrink-0 text-sm">
+              {activeWorkspace?.name.charAt(0).toUpperCase() || 'W'}
             </div>
-            <div className="truncate">
-              <p className="text-sm font-semibold text-zinc-100 truncate group-hover:text-white transition-colors">
+            <div className="truncate text-left">
+              <p className="text-sm font-semibold text-foreground truncate leading-tight">
                 {activeWorkspace?.name || 'Select Workspace'}
               </p>
-              <p className="text-xs text-zinc-400 truncate">
-                {activeWorkspace?.role === 'owner' ? 'Owner' : 'Member'}
+              <p className="text-[11px] text-muted-foreground capitalize">
+                {activeWorkspace?.role || 'Member'}
               </p>
             </div>
           </div>
-          <svg className={`w-4 h-4 text-zinc-500 transition-transform ${isWorkspaceOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
+          <ChevronDown
+            size={15}
+            className={cn(
+              'text-muted-foreground transition-transform shrink-0 ml-1',
+              isWorkspaceOpen && 'rotate-180'
+            )}
+          />
+        </button>
 
         {/* Workspace Dropdown */}
         <AnimatePresence>
           {isWorkspaceOpen && (
-            <motion.div 
-              initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            <motion.div
+              initial={{ opacity: 0, y: -8, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -10, scale: 0.95 }}
-              transition={{ duration: 0.15, ease: "easeOut" }}
-              className="absolute top-16 left-4 right-4 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1 z-50 origin-top overflow-hidden"
+              exit={{ opacity: 0, y: -8, scale: 0.96 }}
+              transition={{ duration: 0.13, ease: 'easeOut' }}
+              className="absolute top-[72px] left-3 right-3 bg-popover border border-border rounded-xl shadow-xl py-1.5 z-50 overflow-hidden"
             >
-              <div className="px-3 py-2 text-[10px] font-bold text-zinc-500 uppercase tracking-wider bg-zinc-800/50">Solo Workspaces</div>
-              {workspaces.filter(ws => ws.type === 'solo').map(ws => (
-                <div 
-                  key={ws.id} 
-                  className={cn(
-                    "px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white cursor-pointer flex items-center justify-between transition-colors",
-                    activeWorkspace?.id === ws.id && "bg-zinc-700 font-medium text-white"
-                  )}
-                  onClick={() => {
-                    setActiveWorkspace(ws.id);
-                    setIsWorkspaceOpen(false);
-                  }}
-                >
-                  <span>{ws.name}</span>
-                  {activeWorkspace?.id === ws.id && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />}
-                </div>
-              ))}
-              <div className="px-3 py-2 text-[10px] font-bold text-zinc-500 uppercase tracking-wider bg-zinc-800/50 border-t border-zinc-700">Team Workspaces</div>
-              {workspaces.filter(ws => ws.type === 'team').map(ws => (
-                <div 
-                  key={ws.id} 
-                  className={cn(
-                    "px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white cursor-pointer flex items-center justify-between transition-colors",
-                    activeWorkspace?.id === ws.id && "bg-zinc-700 font-medium text-white"
-                  )}
-                  onClick={() => {
-                    setActiveWorkspace(ws.id);
-                    setIsWorkspaceOpen(false);
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="truncate">{ws.name}</span>
+              {['solo', 'team'].map(type => {
+                const filtered = workspaces.filter(ws => ws.type === type);
+                if (filtered.length === 0) return null;
+                return (
+                  <div key={type}>
+                    <p className="px-3 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                      {type === 'solo' ? 'Personal' : 'Team'}
+                    </p>
+                    {filtered.map(ws => (
+                      <button
+                        key={ws.id}
+                        className={cn(
+                          'w-full px-3 py-2 text-sm text-left hover:bg-accent transition-colors flex items-center justify-between gap-2',
+                          activeWorkspace?.id === ws.id
+                            ? 'text-primary font-semibold'
+                            : 'text-foreground/80'
+                        )}
+                        onClick={() => {
+                          selectWorkspace(ws.id);
+                          setIsWorkspaceOpen(false);
+                        }}
+                      >
+                        <span className="truncate">{ws.name}</span>
+                        {activeWorkspace?.id === ws.id && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                        )}
+                      </button>
+                    ))}
                   </div>
-                  {activeWorkspace?.id === ws.id && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />}
-                </div>
-              ))}
-              <div className="h-px bg-zinc-700 my-1"></div>
-              <div className="px-3 py-2 text-sm text-indigo-400 hover:bg-zinc-700 hover:text-indigo-300 cursor-pointer flex items-center gap-2 transition-colors">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                Create Workspace
-              </div>
+                );
+              })}
+              <div className="h-px bg-border my-1" />
+              <button className="w-full px-3 py-2 text-sm text-primary hover:bg-accent transition-colors flex items-center gap-2">
+                <Plus size={14} /> Create Workspace
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      <div className="flex-1 py-4 flex flex-col gap-1 px-3 overflow-y-auto">
-        <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1 px-3 mt-2">
-          Main
-        </div>
-        {navItems.filter(i => ['Dashboard', 'All Notes', 'Tags', 'Graph View'].includes(i.name)).map((item) => {
-          const Icon = item.icon;
-          const isActive = location.pathname === item.path;
-          return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all group",
-                isActive 
-                  ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white" 
-                  : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-white"
-              )}
-            >
-              <Icon size={18} className={cn(
-                "transition-colors",
-                isActive ? "text-indigo-500 dark:text-indigo-400" : "text-zinc-400 group-hover:text-zinc-500 dark:group-hover:text-zinc-300"
-              )} />
-              {item.name}
-            </Link>
-          );
-        })}
+      {/* Navigation */}
+      <nav className="flex-1 py-3 flex flex-col gap-4 px-3 overflow-y-auto">
+        {NAV_SECTIONS.map(section => (
+          <div key={section.label}>
+            <p className="px-3 mb-1 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+              {section.label}
+            </p>
+            <div className="space-y-0.5">
+              {section.items.map(item => (
+                <NavLink key={item.path} item={item} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
 
-        <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1 px-3 mt-6">
-          Integrations
-        </div>
-        <Link
-          to="/github"
-          className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all group",
-            location.pathname === "/github" 
-              ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white" 
-              : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-white"
-          )}
-        >
-          <Github size={18} className={cn(
-            "transition-colors",
-            location.pathname === "/github" ? "text-indigo-500 dark:text-indigo-400" : "text-zinc-400 group-hover:text-zinc-500 dark:group-hover:text-zinc-300"
-          )} />
-          GitHub Target
-        </Link>
-        
-        <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1 px-3 mt-6">
-          System
-        </div>
-        <Link
-          to="/settings"
-          className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-all group",
-            location.pathname === "/settings" 
-              ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white" 
-              : "text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-white"
-          )}
-        >
-          <Settings size={18} className={cn(
-            "transition-colors",
-            location.pathname === "/settings" ? "text-indigo-500 dark:text-indigo-400" : "text-zinc-400 group-hover:text-zinc-500 dark:group-hover:text-zinc-300"
-          )} />
-          Settings
-        </Link>
-      </div>
-      
-      <div className="p-3 border-t border-zinc-200 dark:border-zinc-800">
-        <button 
+      {/* Footer */}
+      <div className="p-3 border-t border-border">
+        <button
           onClick={logout}
-          className="flex items-center gap-3 px-3 py-2 w-full rounded-md text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+          className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
         >
-          <LogOut size={18} />
+          <LogOut size={17} />
           Logout
         </button>
       </div>

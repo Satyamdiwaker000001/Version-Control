@@ -1,87 +1,97 @@
-import { Sun, Moon, Bell, Search } from 'lucide-react';
+import { Sun, Moon, Bell, Search, Monitor } from 'lucide-react';
 import { useThemeStore } from '@/shared/store/useThemeStore';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { motion } from 'framer-motion';
+import { cn } from '@/shared/utils/cn';
 
 export const Header = ({ onOpenCommand }: { onOpenCommand: () => void }) => {
-  const { isDarkMode, setTheme } = useThemeStore();
+  const { isDarkMode, themeMode, setTheme } = useThemeStore();
   const user = useAuthStore((state) => state.user);
 
-  // Mock real-time user presences
   const mockPresence = [
-    { id: 'u2', name: 'Alex Johnson', color: 'bg-blue-500' },
-    { id: 'u3', name: 'Sarah Chen', color: 'bg-emerald-500' }
+    { id: 'u2', initial: 'A', color: 'bg-blue-500' },
+    { id: 'u3', initial: 'S', color: 'bg-emerald-500' },
   ];
 
+  const cycleTheme = () => {
+    const next = isDarkMode ? 'light' : 'dark';
+    setTheme(next);
+  };
+
   return (
-    <motion.header 
+    <motion.header
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="h-14 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between px-6 transition-colors relative z-20"
+      transition={{ duration: 0.25, ease: 'easeOut' }}
+      className="h-14 bg-card border-b border-border flex items-center justify-between px-4 sm:px-6 transition-colors z-20 shrink-0"
     >
-      <div className="flex-1 flex items-center">
-        <div 
-          className="relative w-full max-w-md hidden sm:block cursor-pointer group"
+      {/* Search Bar */}
+      <div className="flex-1 max-w-md hidden sm:block">
+        <button
           onClick={onOpenCommand}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-border bg-background/50 hover:bg-accent text-muted-foreground hover:text-foreground transition-all text-sm group"
         >
-          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <Search size={16} className="text-zinc-400 group-hover:text-indigo-500 transition-colors" />
-          </div>
-          <div className="flex items-center w-full rounded-md border border-zinc-200 dark:border-zinc-800 py-1.5 pl-10 pr-3 text-sm leading-6 bg-zinc-50 dark:bg-zinc-900/50 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
-            Search commands, notes, or tags...
-            <kbd className="ml-auto flex items-center gap-1 rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-1.5 font-mono text-[10px] font-medium text-zinc-500 opacity-100">
-              <span className="text-xs">⌘</span>K
-            </kbd>
-          </div>
-        </div>
+          <Search size={15} className="shrink-0" />
+          <span className="flex-1 text-left">Search notes, commands...</span>
+          <kbd className="hidden sm:flex items-center gap-1 rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium">
+            <span>⌘</span>K
+          </kbd>
+        </button>
       </div>
-      
-      <div className="flex items-center gap-2 sm:gap-4 ml-4">
-        {/* Real-Time Presence Indicators */}
-        <div className="hidden md:flex items-center mr-4">
-          <div className="flex items-center relative mr-2">
-             <div className="flex -space-x-2">
-               {mockPresence.map((p, i) => (
-                 <div key={p.id} className={`w-7 h-7 rounded-full border-2 border-white dark:border-zinc-900 ${p.color} flex items-center justify-center text-[10px] font-bold text-white z-${20-i}`}>
-                   {p.name.charAt(0)}
-                 </div>
-               ))}
-               <div className={`w-7 h-7 rounded-full border-2 border-white dark:border-zinc-900 bg-indigo-500 flex items-center justify-center text-[10px] font-bold text-white z-0`}>
-                 {user?.name?.charAt(0) || 'U'}
-               </div>
-             </div>
+
+      <div className="flex items-center gap-1.5 sm:gap-2 ml-auto">
+        {/* Real-time presence */}
+        <div className="hidden md:flex items-center gap-3 mr-2">
+          <div className="flex -space-x-2">
+            {mockPresence.map((p) => (
+              <div
+                key={p.id}
+                className={cn(
+                  'w-7 h-7 rounded-full border-2 border-card flex items-center justify-center text-[10px] font-bold text-white',
+                  p.color
+                )}
+              >
+                {p.initial}
+              </div>
+            ))}
+            <div className="w-7 h-7 rounded-full border-2 border-card bg-primary flex items-center justify-center text-[10px] font-bold text-primary-foreground">
+              {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U'}
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800/50">
-             <span className="relative flex h-2 w-2">
-               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-             </span>
-             <span className="text-[10px] font-medium uppercase tracking-wider">Live Editing</span>
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+            </span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider">Live</span>
           </div>
         </div>
 
-        <button 
-          onClick={() => setTheme(isDarkMode ? 'light' : 'dark')}
-          className="p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
-          aria-label="Toggle Dark Mode"
+        {/* Theme toggle */}
+        <button
+          onClick={cycleTheme}
+          className="p-2 text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg transition-colors"
+          aria-label="Toggle theme"
+          title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
         >
-          {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+          {isDarkMode ? <Sun size={17} /> : <Moon size={17} />}
         </button>
-        
-        <button className="p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors relative">
-          <Bell size={18} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 border-2 border-white dark:border-zinc-900"></span>
+
+        {/* Notifications */}
+        <button className="p-2 text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg transition-colors relative">
+          <Bell size={17} />
+          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-destructive" />
         </button>
-        
-        <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700 mx-1"></div>
-        
-        <div className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
-          <div className="w-7 h-7 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-700 dark:text-indigo-300 font-semibold text-xs border border-indigo-200 dark:border-indigo-800">
+
+        <div className="w-px h-5 bg-border mx-0.5" />
+
+        {/* User avatar */}
+        <div className="flex items-center gap-2 cursor-pointer hover:bg-accent rounded-lg px-2 py-1.5 transition-colors">
+          <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-xs border border-primary/30">
             {user?.email?.charAt(0).toUpperCase() || 'U'}
           </div>
-          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 hidden md:block">
-            {user?.email?.split('@')[0] || 'User'}
+          <span className="text-sm font-medium text-foreground hidden md:block">
+            {user?.name || user?.email?.split('@')[0] || 'User'}
           </span>
         </div>
       </div>

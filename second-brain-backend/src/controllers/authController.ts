@@ -1,91 +1,147 @@
-import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { z } from 'zod';
+import { Request, Response } from "express";
+import { z } from "zod";
+import { authService } from "../services/authService";
+import { AppError } from "../types";
 
-const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
-
-const registerSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
-  name: z.string().optional()
+// Validation schemas
+const LoginSchema = z.object({
+  email: z.string().email("Invalid email"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string()
+const RegisterSchema = z.object({
+  email: z.string().email("Invalid email"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  name: z.string().min(2, "Name must be at least 2 characters"),
 });
 
 export const authController = {
+  // Register new user
   register: async (req: Request, res: Response) => {
     try {
-      const { email, password, name } = registerSchema.parse(req.body);
-
-      const existingUser = await prisma.user.findUnique({ where: { email } });
-      if (existingUser) {
-        return res.status(400).json({ error: 'User already exists' });
-      }
-
-      const passwordHash = await bcrypt.hash(password, 10);
-
-      const user = await prisma.user.create({
-        data: {
-          email,
-          name,
-          passwordHash
-        }
-      });
-
-      const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+      const input = RegisterSchema.parse(req.body);
+      const result = await authService.register(input);
 
       res.status(201).json({
-        token,
-        user: { id: user.id, email: user.email, name: user.name }
+        success: true,
+        data: result,
       });
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: "VALIDATION_ERROR",
+          details: error.errors,
+        });
+      }
+
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+      });
     }
   },
 
+  // Login user
   login: async (req: Request, res: Response) => {
-     try {
-       const { email, password } = loginSchema.parse(req.body);
+    try {
+      const input = LoginSchema.parse(req.body);
+      const result = await authService.login(input);
 
-       const user = await prisma.user.findUnique({ where: { email } });
-       if (!user) {
-         return res.status(401).json({ error: 'Invalid credentials' });
-       }
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: "VALIDATION_ERROR",
+          details: error.errors,
+        });
+      }
 
-       const isMatch = await bcrypt.compare(password, user.passwordHash);
-       if (!isMatch) {
-         return res.status(401).json({ error: 'Invalid credentials' });
-       }
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
 
-       const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: '7d' });
-
-       res.status(200).json({
-         token,
-         user: { id: user.id, email: user.email, name: user.name }
-       });
-     } catch (error: any) {
-       res.status(400).json({ error: error.message });
-     }
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+      });
+    }
   },
 
+  // Get current user
   me: async (req: any, res: Response) => {
     try {
-      const dbUser = await prisma.user.findUnique({
-        where: { id: req.user.id },
-        select: { id: true, email: true, name: true, createdAt: true }
+      const userId = req.userId;
+      const user = await authService.getUserById(userId);
+
+      res.json({
+        success: true,
+        data: user,
+      });
+    } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+      });
+    }
+  },
+
+  // Update user profile
+  updateProfile: async (req: any, res: Response) => {
+    try {
+      const userId = req.userId;
+      const { name, avatar } = req.body;
+
+      const user = await authService.updateProfile(userId, {
+        name,
+        avatar,
       });
 
-      if (!dbUser) return res.status(404).json({ error: 'User not found' });
-      
-      res.json({ user: dbUser });
-    } catch (e: any) {
-      res.status(500).json({ error: 'Server error' });
+      res.json({
+        success: true,
+        data: user,
+      });
+    } catch (error: any) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({
+          success: false,
+          error: error.code,
+          message: error.message,
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        error: "INTERNAL_ERROR",
+        message: "An unexpected error occurred",
+      });
     }
-  }
+  },
 };

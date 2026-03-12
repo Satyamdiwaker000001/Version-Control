@@ -18,6 +18,7 @@ import RepositoryDetailsPage from '@/features/github/components/RepositoryDetail
 import CommitTimelinePage from '@/features/github/components/CommitTimelinePage';
 import TagsPage from '@/features/tags/components/TagsPage';
 import SettingsPage from '@/features/settings/components/SettingsPage';
+import { ProjectPage } from '@/features/projects/components/ProjectPage';
 
 // Store
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
@@ -89,6 +90,7 @@ function App() {
             <Route path="/repository/:id" element={<RepositoryDetailsPage />} />
             <Route path="/repository/:id/commits" element={<CommitTimelinePage />} />
             <Route path="/tags" element={<TagsPage />} />
+            <Route path="/projects" element={<ProjectPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Routes>

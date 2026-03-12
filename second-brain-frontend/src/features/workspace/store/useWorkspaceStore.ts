@@ -1,66 +1,158 @@
 import { create } from 'zustand';
-import type { Workspace } from '@/shared/types';
+import { workspaceService, type Workspace, type WorkspaceMember } from '../services/workspaceService';
 
-import axios from 'axios';
+// ─── Mock data (offline fallback) ────────────────────────────────────────────
+const MOCK_WORKSPACES: Workspace[] = [
+  {
+    id: 'ws1',
+    name: 'My Knowledge Base',
+    slug: 'my-knowledge-base',
+    type: 'solo',
+    avatar: null,
+    description: 'Personal notes and research workspace',
+    githubOwner: null,
+    role: 'owner',
+    createdAt: new Date(Date.now() - 86400000 * 10).toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    id: 'ws2',
+    name: 'Team Research',
+    slug: 'team-research',
+    type: 'team',
+    avatar: null,
+    description: 'Shared workspace for collaborative research',
+    githubOwner: 'myorg',
+    role: 'owner',
+    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+];
 
-export interface WorkspaceState {
+interface WorkspaceStore {
   workspaces: Workspace[];
   activeWorkspace: Workspace | null;
-  setActiveWorkspace: (id: string) => void;
-  fetchCollaborators: (workspaceId: string, token: string) => Promise<void>;
+  members: WorkspaceMember[];
+  isLoading: boolean;
+  error: string | null;
+
+  fetchWorkspaces: () => Promise<void>;
+  selectWorkspace: (workspaceId: string) => Promise<void>;
+  createWorkspace: (data: { name: string; type: 'solo' | 'team'; description?: string }) => Promise<Workspace>;
+  updateWorkspace: (workspaceId: string, data: Partial<any>) => Promise<void>;
+  fetchMembers: (workspaceId: string) => Promise<void>;
+  addMember: (workspaceId: string, email: string) => Promise<void>;
+  removeMember: (workspaceId: string, memberId: string) => Promise<void>;
+  setError: (error: string | null) => void;
 }
 
-export const useWorkspaceStore = create<WorkspaceState>((set) => ({
-  workspaces: [
-    { 
-      id: 'ws1', 
-      name: 'Personal Vault', 
-      type: 'solo',
-      role: 'owner', 
-      members: [
-        { user: { id: 'u1', email: 'alex@example.com', name: 'Alex', createdAt: new Date().toISOString() }, role: 'owner', joinedAt: new Date().toISOString() }
-      ]
-    },
-    { 
-      id: 'ws2', 
-      name: 'System Design Prep', 
-      type: 'team',
-      role: 'editor', 
-      members: [
-        { user: { id: 'u1', email: 'alex@example.com', name: 'Alex', createdAt: new Date().toISOString() }, role: 'editor', joinedAt: new Date().toISOString() },
-        { user: { id: 'u2', email: 'sarah@example.com', name: 'Sarah', createdAt: new Date().toISOString() }, role: 'owner', joinedAt: new Date().toISOString() }
-      ]
-    },
-    { 
-      id: 'ws3', 
-      name: 'Startup Ideas', 
-      type: 'team',
-      role: 'owner', 
-      members: [
-        { user: { id: 'u1', email: 'alex@example.com', name: 'Alex', createdAt: new Date().toISOString() }, role: 'owner', joinedAt: new Date().toISOString() },
-        { user: { id: 'u3', email: 'mike@example.com', name: 'Mike', createdAt: new Date().toISOString() }, role: 'viewer', joinedAt: new Date().toISOString() }
-      ]
-    },
-  ],
-  activeWorkspace: null,
-  setActiveWorkspace: (id) => set((state) => ({
-    activeWorkspace: state.workspaces.find(w => w.id === id) || null
-  })),
-  fetchCollaborators: async (workspaceId, token) => {
+export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
+  // Initialize with mock workspaces so dashboard renders immediately
+  workspaces: MOCK_WORKSPACES,
+  activeWorkspace: MOCK_WORKSPACES[0],
+  members: [],
+  isLoading: false,
+  error: null,
+
+  fetchWorkspaces: async () => {
+    set({ isLoading: true, error: null });
     try {
-      const res = await axios.get(`http://localhost:3001/api/workspaces/${workspaceId}/collaborators`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      set((state) => ({
-        workspaces: state.workspaces.map(w => 
-          w.id === workspaceId ? { ...w, members: res.data.members } : w
-        ),
-        activeWorkspace: state.activeWorkspace?.id === workspaceId 
-          ? { ...state.activeWorkspace, members: res.data.members } 
-          : state.activeWorkspace
-      }));
-    } catch (e) {
-      console.error('Failed to fetch workspace collaborators', e);
+      const workspaces = await workspaceService.getWorkspaces();
+      const active = workspaces[0] || null;
+      set({ workspaces, activeWorkspace: active, isLoading: false });
+    } catch {
+      // Keep mock data on network error
+      set({ isLoading: false });
     }
-  }
+  },
+
+  selectWorkspace: async (workspaceId: string) => {
+    const existing = get().workspaces.find(w => w.id === workspaceId);
+    if (existing) set({ activeWorkspace: existing });
+    try {
+      const workspace = await workspaceService.getWorkspace(workspaceId);
+      set({ activeWorkspace: workspace });
+      get().fetchMembers(workspaceId);
+    } catch {
+      // Already set from local
+    }
+  },
+
+  createWorkspace: async (data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const workspace = await workspaceService.createWorkspace(data);
+      set((state) => ({
+        workspaces: [...state.workspaces, workspace],
+        activeWorkspace: workspace,
+        isLoading: false,
+      }));
+      return workspace;
+    } catch {
+      const mockWs: Workspace = {
+        id: `ws_${Date.now()}`,
+        name: data.name,
+        slug: data.name.toLowerCase().replace(/\s+/g, '-'),
+        type: data.type,
+        avatar: null,
+        description: data.description || null,
+        githubOwner: null,
+        role: 'owner',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      set((state) => ({
+        workspaces: [...state.workspaces, mockWs],
+        activeWorkspace: mockWs,
+        isLoading: false,
+      }));
+      return mockWs;
+    }
+  },
+
+  updateWorkspace: async (workspaceId, data) => {
+    try {
+      const updated = await workspaceService.updateWorkspace(workspaceId, data);
+      set((state) => ({
+        workspaces: state.workspaces.map(w => w.id === workspaceId ? updated : w),
+        activeWorkspace: state.activeWorkspace?.id === workspaceId ? updated : state.activeWorkspace,
+      }));
+    } catch {
+      set((state) => ({
+        workspaces: state.workspaces.map(w => w.id === workspaceId ? { ...w, ...data } : w),
+        activeWorkspace: state.activeWorkspace?.id === workspaceId ? { ...state.activeWorkspace!, ...data } : state.activeWorkspace,
+      }));
+    }
+  },
+
+  fetchMembers: async (workspaceId: string) => {
+    try {
+      const members = await workspaceService.getMembers(workspaceId);
+      set({ members });
+    } catch {
+      set({ members: [] });
+    }
+  },
+
+  addMember: async (workspaceId: string, email: string) => {
+    try {
+      await workspaceService.addMember(workspaceId, email);
+      get().fetchMembers(workspaceId);
+    } catch (error: any) {
+      set({ error: error.message });
+      throw error;
+    }
+  },
+
+  removeMember: async (workspaceId: string, memberId: string) => {
+    try {
+      await workspaceService.removeMember(workspaceId, memberId);
+      get().fetchMembers(workspaceId);
+    } catch (error: any) {
+      set({ error: error.message });
+      throw error;
+    }
+  },
+
+  setError: (error) => set({ error }),
 }));

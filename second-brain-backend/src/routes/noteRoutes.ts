@@ -6,10 +6,15 @@ const router = Router();
 
 router.use(authenticateToken as RequestHandler);
 
-// The base path expects /api/notes/:workspaceId in mounting, or we define it here:
+// Notes CRUD
+router.post('/:workspaceId', noteController.createNote as RequestHandler);
 router.get('/:workspaceId', noteController.listNotes as RequestHandler);
-router.get('/:workspaceId/:slug', noteController.getNote as RequestHandler);
-router.get('/:workspaceId/:slug/history', noteController.getHistory as RequestHandler);
-router.post('/:workspaceId', noteController.saveNote as RequestHandler);
+router.get('/:noteId', noteController.getNote as RequestHandler);
+router.patch('/:noteId', noteController.updateNote as RequestHandler);
+router.delete('/:noteId', noteController.deleteNote as RequestHandler);
+
+// Versions
+router.get('/:noteId/versions', noteController.getVersions as RequestHandler);
+router.post('/:noteId/versions/:versionId/restore', noteController.restoreVersion as RequestHandler);
 
 export default router;

@@ -1,5 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Second Brain Database Schema
+// Comprehensive schema for a developer collaboration platform
 
 generator client {
   provider = "prisma-client-js"
@@ -10,25 +10,226 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
+
 model User {
-  id              String      @id @default(uuid())
-  email           String      @unique
-  name            String?
-  passwordHash    String
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  workspaces      Workspace[]
+  id                String            @id @default(uuid())
+  email             String            @unique
+  name              String?
+  passwordHash      String
+  avatar            String?
+  githubUsername    String?           @unique
+  githubAccessToken String?           // For GitHub OAuth
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  // Relations
+  workspaces        WorkspaceMember[]
+  notes             Note[]
+  messages          Message[]
+  presences         UserPresence[]
 }
 
+// ============================================
+// WORKSPACE & COLLABORATION
+// ============================================
+
 model Workspace {
-  id               String   @id @default(uuid())
-  name             String
-  type             String   // "solo" or "team"
-  githubOwner      String?  // GitHub username or organization
-  githubRepo       String?  // Exact Repository name (e.g. "second-brain-notes")
-  githubAccessToken String?  // Authorized token for interacting with the repo
-  userId           String
-  user             User     @relation(fields: [userId], references: [id])
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                String            @id @default(uuid())
+  name              String
+  slug              String            @unique
+  type              String            // "solo" or "team"
+  avatar            String?
+  description       String?
+  githubOwner       String?           // GitHub username or organization
+  githubAccessToken String?           // Token for GitHub integration
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  // Relations
+  members           WorkspaceMember[]
+  notes             Note[]
+  tags              Tag[]
+  channels          Channel[]
+  repositories      Repository[]
+  presences         UserPresence[]
+}
+
+model WorkspaceMember {
+  id                String            @id @default(uuid())
+  userId            String
+  workspaceId       String
+  role              String            @default("member") // "owner", "admin", "member"
+  joinedAt          DateTime          @default(now())
+  
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace         Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, workspaceId])
+}
+
+model UserPresence {
+  id                String            @id @default(uuid())
+  userId            String
+  workspaceId       String
+  status            String            @default("online") // "online", "away", "offline"
+  lastActivityAt    DateTime          @default(now())
+  
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace         Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, workspaceId])
+}
+
+// ============================================
+// NOTES & DOCUMENTATION
+// ============================================
+
+model Note {
+  id                String            @id @default(uuid())
+  workspaceId       String
+  userId            String
+  title             String
+  content           String            // Markdown content
+  description       String?           // Brief summary
+  isPublic          Boolean           @default(false)
+  isPinned          Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  // Relations
+  workspace         Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tags              NoteTag[]
+  versions          NoteVersion[]
+  linkedRepositories NoteRepository[]
+  messages          Message[]         // Notes can have threaded discussion
+  
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+model NoteVersion {
+  id                String            @id @default(uuid())
+  noteId            String
+  content           String            // Markdown content snapshot
+  version           Int               @default(1)
+  createdAt         DateTime          @default(now())
+  
+  note              Note              @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  
+  @@index([noteId])
+}
+
+// ============================================
+// TAGS & TAXONOMY
+// ============================================
+
+model Tag {
+  id                String            @id @default(uuid())
+  workspaceId       String
+  name              String
+  color             String            @default("#6366F1") // Hex color
+  emoji             String?
+  description       String?
+  createdAt         DateTime          @default(now())
+  
+  workspace         Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  notes             NoteTag[]
+  
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model NoteTag {
+  id                String            @id @default(uuid())
+  noteId            String
+  tagId             String
+  
+  note              Note              @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag               Tag               @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  
+  @@unique([noteId, tagId])
+}
+
+// ============================================
+// GITHUB INTEGRATION
+// ============================================
+
+model Repository {
+  id                String            @id @default(uuid())
+  workspaceId       String
+  name              String
+  owner             String
+  url               String
+  description       String?
+  isPrivate         Boolean           @default(false)
+  language          String?
+  stars             Int               @default(0)
+  lastSyncedAt      DateTime?
+  createdAt         DateTime          @default(now())
+  
+  workspace         Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  linkedNotes       NoteRepository[]
+  
+  @@unique([workspaceId, owner, name])
+  @@index([workspaceId])
+}
+
+model NoteRepository {
+  id                String            @id @default(uuid())
+  noteId            String
+  repositoryId      String
+  linkedAt          DateTime          @default(now())
+  
+  note              Note              @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  repository        Repository        @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  
+  @@unique([noteId, repositoryId])
+}
+
+// ============================================
+// CHAT & MESSAGING
+// ============================================
+
+model Channel {
+  id                String            @id @default(uuid())
+  workspaceId       String
+  name              String
+  description       String?
+  isPrivate         Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  workspace         Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  messages          Message[]
+  
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model Message {
+  id                String            @id @default(uuid())
+  workspaceId       String
+  channelId         String?           // Optional (can be in Notes too)
+  noteId            String?           // Optional (for note discussions)
+  userId            String
+  content           String
+  parentMessageId   String?           // For threaded replies
+  reactions         String?           // JSON string of reactions
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  channel           Channel?          @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  note              Note?             @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  author            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replies           Message[]         @relation("MessageReplies")
+  parentMessage     Message?          @relation("MessageReplies", fields: [parentMessageId], references: [id], onDelete: Cascade)
+  
+  @@index([channelId])
+  @@index([noteId])
+  @@index([userId])
+  @@index([parentMessageId])
 }

@@ -6,8 +6,11 @@ const router = Router();
 
 router.use(authenticateToken as RequestHandler);
 
-// :type is expected to be 'tags' or 'graph'
-router.get('/:workspaceId/:type', taxonomyController.getConfig as RequestHandler);
-router.post('/:workspaceId/:type', taxonomyController.updateConfig as RequestHandler);
+// Tag CRUD
+router.post('/:workspaceId/tags', taxonomyController.createTag as RequestHandler);
+router.get('/:workspaceId/tags', taxonomyController.listTags as RequestHandler);
+router.get('/:tagId', taxonomyController.getTag as RequestHandler);
+router.patch('/:tagId', taxonomyController.updateTag as RequestHandler);
+router.delete('/:tagId', taxonomyController.deleteTag as RequestHandler);
 
 export default router;

@@ -5,10 +5,17 @@ import { authenticateToken } from '../middlewares/authMiddleware';
 const router = Router();
 
 // Protect all workspace routes with auth middleware
-router.use(authenticateToken); 
+router.use(authenticateToken);
 
-router.post('/link', workspaceController.createLinkedWorkspace);
-router.get('/', workspaceController.listMyWorkspaces);
-router.get('/:workspaceId/collaborators', workspaceController.listCollaborators);
+// Workspace CRUD
+router.post('/', workspaceController.createWorkspace);
+router.get('/', workspaceController.listWorkspaces);
+router.get('/:workspaceId', workspaceController.getWorkspace);
+router.patch('/:workspaceId', workspaceController.updateWorkspace);
+
+// Members
+router.get('/:workspaceId/members', workspaceController.getMembers);
+router.post('/:workspaceId/members', workspaceController.addMember);
+router.delete('/:workspaceId/members/:memberId', workspaceController.removeMember);
 
 export default router;
