@@ -1,220 +1,598 @@
-import { useNoteStore } from '@/features/notes/store/useNoteStore';
+import { useMemo } from 'react';
+import { useNoteStore, MOCK_TEAM_MEMBERS, mockTeamActivity } from '@/features/notes/store/useNoteStore';
 import type { NoteState } from '@/features/notes/store/useNoteStore';
 import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
 import { useTagStore } from '@/features/tags/store/useTagStore';
 import type { Note } from '@/shared/types';
-import { Pin, Clock, GitCommit, FileText, Activity, Hash, Users, Network, Plus, FolderSync, Share2, ArrowRight } from 'lucide-react';
+import {
+  Pin, Clock, GitCommit, FileText, Activity, Hash,
+  Users, Network, Plus, FolderSync, Share2, ArrowRight,
+  Pencil, Star, Zap, BookOpen, TrendingUp, GitBranch,
+  MessageSquare, UserCheck, CircleDot,
+} from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/shared/ui/Button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/shared/ui/Card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/ui/Card';
 import { cn } from '@/shared/utils/cn';
+import { motion } from 'framer-motion';
 
-export const DashboardPage = () => {
-  const allNotes = useNoteStore((state: NoteState) => state.notes);
-  const tags = useTagStore((state) => state.tags);
-  const { workspaces, activeWorkspace: storeActiveWorkspace } = useWorkspaceStore();
-  const activeWorkspace = storeActiveWorkspace || workspaces[0];
+// ─── Animation wrapper ────────────────────────────────────────────────────────
+const FadeIn = ({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 16 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.4, ease: 'easeOut', delay }}
+  >
+    {children}
+  </motion.div>
+);
+
+// ─── Author pill ──────────────────────────────────────────────────────────────
+const AuthorPill = ({ userId }: { userId: string }) => {
+  const member = MOCK_TEAM_MEMBERS.find(m => m.id === userId);
+  if (!member) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full"
+      style={{ backgroundColor: member.color + '18', color: member.color }}
+    >
+      <span
+        className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] text-white font-bold"
+        style={{ backgroundColor: member.color }}
+      >
+        {member.initials[0]}
+      </span>
+      {member.name}
+    </span>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SOLO DASHBOARD
+// ═══════════════════════════════════════════════════════════════════════════════
+const SoloDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) => {
   const navigate = useNavigate();
-
-  const notes = allNotes.filter(n => n.workspaceId === activeWorkspace?.id);
-  const pinnedNotes = notes.filter((n: Note) => n.isPinned);
+  const tags = useTagStore(s => s.tags);
+  const pinnedNotes = notes.filter(n => n.isPinned);
   const recentNotes = [...notes]
-    .sort((a: Note, b: Note) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, 5);
-
-  if (!activeWorkspace) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <Activity className="animate-spin text-primary" />
-      </div>
-    );
-  }
+  const totalWords = notes.reduce((acc, n) => acc + n.content.split(' ').length, 0);
+  const totalVersions = notes.reduce((acc, n) => acc + n.versionCount, 0);
 
   return (
-    <div className="h-full flex flex-col space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
-      
-      {/* Workspace Header Overview */}
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-primary/10 text-primary border border-primary/20 uppercase tracking-wider">
-              {activeWorkspace.role || 'MEMBER'}
+    <div className="space-y-8 pb-12">
+      {/* Hero */}
+      <FadeIn>
+        <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+          <div className="space-y-2">
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary/70 uppercase tracking-widest">
+              <CircleDot size={10} className="text-primary" /> Personal Space
             </span>
-            <span className="text-muted-foreground text-xs font-medium">
-              {activeWorkspace.type === 'team' ? 'Team Workspace' : 'Personal Space'}
-            </span>
+            <h1 className="text-4xl font-extrabold tracking-tight text-foreground">
+              {workspace.name}
+            </h1>
+            <p className="text-muted-foreground">
+              Your private knowledge garden. Write, explore, grow.
+            </p>
           </div>
-          <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">
-            {activeWorkspace.name}
-          </h1>
-          <p className="text-muted-foreground max-w-lg">
-            Welcome back. Your knowledge ecosystem is synchronized and ready for deep work.
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm" onClick={() => navigate('/github')} className="gap-2">
-            <FolderSync size={16} /> <span className="hidden sm:inline">Repositories</span>
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate('/graph')} className="gap-2 hidden sm:flex">
-            <Share2 size={16} /> <span>Open Graph</span>
-          </Button>
-          <Button size="sm" onClick={() => navigate('/editor?new=true')} className="gap-2 premium-shadow">
-            <Plus size={16} /> <span>Create Note</span>
-          </Button>
-        </div>
-      </header>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate('/graph')} className="gap-2">
+              <Share2 size={15} /> Graph
+            </Button>
+            <Button size="sm" onClick={() => navigate('/editor?new=true')} className="gap-2 premium-shadow">
+              <Plus size={15} /> New Note
+            </Button>
+          </div>
+        </header>
+      </FadeIn>
 
-      {/* Analytics KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Notes', value: notes.length, icon: FileText, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-          { label: 'Connections', value: notes.reduce((acc, note) => acc + (note.backlinks?.length || 0), 0), icon: Network, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-          { label: 'Active Tags', value: tags.length, icon: Hash, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-          { label: 'Members', value: activeWorkspace.type === 'team' ? 3 : 1, icon: Users, color: 'text-indigo-500', bg: 'bg-indigo-500/10' },
-        ].map((stat, i) => (
-          <Card key={i} className="group cursor-default hover:border-primary/50 transition-all">
-            <CardContent className="p-6 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-                <p className="text-3xl font-bold mt-1 tabular-nums">{stat.value}</p>
-              </div>
-              <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110", stat.bg, stat.color)}>
-                <stat.icon size={24} />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Span: Pinned & Recent */}
-        <div className="lg:col-span-2 space-y-8">
-          
-          {/* Pinned Notes Section */}
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold flex items-center gap-2">
-                <Pin size={20} className="text-primary" /> Pinned Ideas
-              </h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {pinnedNotes.length === 0 ? (
-                <div className="col-span-full py-12 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center text-muted-foreground opacity-50">
-                   <Pin size={32} className="mb-2" />
-                   <p>No pinned notes yet</p>
+      {/* Personal Stats — no Members */}
+      <FadeIn delay={0.05}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { label: 'Notes', value: notes.length, icon: FileText, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+            { label: 'Versions', value: totalVersions, icon: GitCommit, color: 'text-violet-500', bg: 'bg-violet-500/10' },
+            { label: 'Total Tags', value: tags.length, icon: Hash, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+            { label: 'Words Written', value: `${(totalWords / 1000).toFixed(1)}k`, icon: BookOpen, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+          ].map((stat, i) => (
+            <Card key={i} className="hover:border-primary/30 transition-all cursor-default group">
+              <CardContent className="p-5 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground">{stat.label}</p>
+                  <p className="text-2xl font-bold mt-1 tabular-nums">{stat.value}</p>
                 </div>
-              ) : pinnedNotes.map((note: Note) => (
-                <Card key={note.id} onClick={() => navigate(`/editor?noteId=${note.id}`)} className="group relative cursor-pointer overflow-hidden hover:border-primary/30">
-                  <div className="absolute top-0 left-0 w-1.5 h-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                  <CardHeader className="p-5">
-                    <div className="flex justify-between items-start gap-2">
-                      <CardTitle className="text-lg group-hover:text-primary transition-colors line-clamp-1">{note.title}</CardTitle>
-                      <Pin size={16} className="text-primary shrink-0" />
-                    </div>
-                    <CardDescription className="line-clamp-2 mt-2">
-                      {note.content.substring(0, 100)}...
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="px-5 pb-5 pt-0">
-                    <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                      <div className="flex gap-2">
-                        {note.tags.slice(0, 2).map((tag: string, i: number) => (
-                          <span key={i} className="bg-secondary px-2 py-1 rounded">#{tag}</span>
-                        ))}
-                      </div>
-                      <span className="flex items-center gap-1"><GitCommit size={12} /> {note.versionCount} VERSIONS</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </section>
+                <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110', stat.bg, stat.color)}>
+                  <stat.icon size={20} />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </FadeIn>
 
-          {/* Recent Notes List */}
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold flex items-center gap-2">
-                <Clock size={20} className="text-primary" /> Recently Edited
-              </h2>
-              <Button variant="ghost" size="sm" className="text-xs text-primary font-bold hover:bg-primary/10">
-                VIEW ALL <ArrowRight size={14} className="ml-1" />
-              </Button>
-            </div>
-            <Card className="overflow-hidden">
-              <div className="divide-y divide-border">
-                {recentNotes.length === 0 ? (
-                  <div className="p-12 text-center text-muted-foreground">No notes found. Create your first note!</div>
-                ) : recentNotes.map((note: Note) => (
-                  <div 
-                    key={note.id} 
-                    onClick={() => navigate(`/editor?noteId=${note.id}`)}
-                    className="p-4 hover:bg-accent/50 transition-all cursor-pointer flex items-center justify-between group"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary transition-colors shrink-0">
-                        <FileText size={20} />
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-1">{note.title}</h4>
-                        <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2 uppercase tracking-wide font-bold">
-                          {formatDistanceToNow(new Date(note.updatedAt))} AGO
-                          {note.tags.length > 0 && (
-                            <>
-                              <span className="text-border">•</span>
-                              <span className="flex items-center gap-1 text-primary/80"><Hash size={10} /> {note.tags[0]}</span>
-                            </>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="hidden sm:flex items-center gap-3">
-                       <span className="text-[10px] font-mono font-bold bg-secondary px-2 py-1 rounded-full text-muted-foreground">{note.latestVersionId.substring(0, 7)}</span>
-                       <ArrowRight size={16} className="text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                    </div>
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+        {/* Left — pinned + recent */}
+        <div className="lg:col-span-3 space-y-8">
+
+          {/* Pinned */}
+          <FadeIn delay={0.1}>
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <Star size={18} className="text-amber-500 fill-amber-500" /> Pinned Notes
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {pinnedNotes.length === 0 ? (
+                  <div className="col-span-full py-10 border-2 border-dashed border-border rounded-xl flex flex-col items-center text-muted-foreground/40 text-sm gap-2">
+                    <Pin size={28} />
+                    <p>Pin a note to keep it at the top</p>
                   </div>
+                ) : pinnedNotes.map(note => (
+                  <Card
+                    key={note.id}
+                    onClick={() => navigate(`/editor?noteId=${note.id}`)}
+                    className="group relative cursor-pointer overflow-hidden hover:border-primary/40 hover:shadow-md transition-all"
+                  >
+                    <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-primary to-violet-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <CardHeader className="p-4 pb-2">
+                      <div className="flex justify-between items-start gap-2">
+                        <CardTitle className="text-sm font-bold group-hover:text-primary transition-colors line-clamp-1">
+                          {note.title}
+                        </CardTitle>
+                        <Pin size={14} className="text-amber-500 fill-amber-500/30 shrink-0 mt-0.5" />
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
+                        {note.content.replace(/#+\s/g, '').substring(0, 90)}...
+                      </p>
+                    </CardHeader>
+                    <CardContent className="px-4 pb-3">
+                      <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        <div className="flex gap-1.5">
+                          {note.tags.slice(0, 2).map((t, i) => (
+                            <span key={i} className="bg-secondary px-2 py-0.5 rounded-full">#{t}</span>
+                          ))}
+                        </div>
+                        <span className="flex items-center gap-1 text-muted-foreground/60">
+                          <GitCommit size={11} /> {note.versionCount}v
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
-            </Card>
-          </section>
+            </section>
+          </FadeIn>
 
-        </div>
-
-        {/* Right Span: Activity Timeline */}
-        <div className="space-y-4">
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <Activity size={20} className="text-primary" /> Global Feed
-          </h2>
-          <Card className="h-[600px] overflow-hidden flex flex-col">
-            <CardContent className="p-6 overflow-y-auto w-full">
-               <div className="relative pl-6 border-l-2 border-border space-y-8 pb-4">
-                  {[
-                    { type: 'commit', content: "You committed 'v4' to ", target: "Neural Networks Basics", time: '2 hours ago', bg: 'bg-primary' },
-                    { type: 'member', content: "Alex joined workspace ", target: activeWorkspace.name, time: '5 hours ago', bg: 'bg-emerald-500' },
-                    { type: 'create', content: "You created note ", target: "Transformer Architecture", time: '2 days ago', bg: 'bg-blue-500' },
-                    { type: 'github', content: "Connected repository ", target: "frontend-v2", time: '3 days ago', bg: 'bg-amber-500' },
-                  ].map((item, i) => (
-                    <div key={i} className="relative">
-                      <span className={cn("absolute -left-[35px] top-1 rounded-full w-5 h-5 border-[3px] border-background flex items-center justify-center", item.bg)}>
-                        <div className="w-1.5 h-1.5 rounded-full bg-white"></div>
-                      </span>
-                      <p className="text-sm font-medium leading-relaxed">
-                        {item.content} 
-                        <span className="text-primary font-bold cursor-pointer hover:underline">{item.target}</span>
-                      </p>
-                      <p className="text-[10px] font-bold text-muted-foreground mt-1 uppercase tracking-wider">{item.time}</p>
+          {/* Recent */}
+          <FadeIn delay={0.15}>
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <Clock size={18} className="text-primary" /> Recently Edited
+                </h2>
+                <Button variant="ghost" size="sm" className="text-xs text-primary gap-1" onClick={() => navigate('/editor')}>
+                  ALL NOTES <ArrowRight size={13} />
+                </Button>
+              </div>
+              <Card className="overflow-hidden">
+                <div className="divide-y divide-border">
+                  {recentNotes.map(note => (
+                    <div
+                      key={note.id}
+                      onClick={() => navigate(`/editor?noteId=${note.id}`)}
+                      className="flex items-center gap-4 px-5 py-3.5 hover:bg-accent/50 cursor-pointer group transition-colors"
+                    >
+                      <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground group-hover:bg-primary/15 group-hover:text-primary transition-colors shrink-0">
+                        <FileText size={17} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold group-hover:text-primary transition-colors truncate">{note.title}</p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Edited {formatDistanceToNow(new Date(note.updatedAt), { addSuffix: true })}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[10px] font-mono bg-secondary px-2 py-0.5 rounded-full text-muted-foreground hidden sm:block">
+                          {note.versionCount}v
+                        </span>
+                        <ArrowRight size={14} className="text-muted-foreground/0 group-hover:text-muted-foreground transition-all translate-x-0 group-hover:translate-x-0.5" />
+                      </div>
                     </div>
                   ))}
-               </div>
-            </CardContent>
-          </Card>
+                </div>
+              </Card>
+            </section>
+          </FadeIn>
         </div>
 
+        {/* Right — quick actions + writing activity */}
+        <div className="lg:col-span-2 space-y-6">
+          <FadeIn delay={0.2}>
+            <Card>
+              <CardHeader className="p-5 pb-3">
+                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                  <Zap size={16} className="text-primary" /> Quick Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-5 pb-5 space-y-2">
+                {[
+                  { label: 'Create a new note', icon: Pencil, action: () => navigate('/editor?new=true'), primary: true },
+                  { label: 'Explore Knowledge Graph', icon: Network, action: () => navigate('/graph') },
+                  { label: 'Connect a Repository', icon: FolderSync, action: () => navigate('/github') },
+                  { label: 'Manage Tags', icon: Hash, action: () => navigate('/tags') },
+                ].map((item, i) => (
+                  <button
+                    key={i}
+                    onClick={item.action}
+                    className={cn(
+                      'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left',
+                      item.primary
+                        ? 'bg-primary text-primary-foreground hover:bg-primary/90 premium-shadow'
+                        : 'bg-accent/50 hover:bg-accent text-foreground'
+                    )}
+                  >
+                    <item.icon size={16} />
+                    {item.label}
+                  </button>
+                ))}
+              </CardContent>
+            </Card>
+          </FadeIn>
+
+          <FadeIn delay={0.25}>
+            <Card>
+              <CardHeader className="p-5 pb-3">
+                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                  <TrendingUp size={16} className="text-primary" /> Writing Streak
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-5 pb-5">
+                <div className="flex items-baseline gap-2 mb-3">
+                  <p className="text-4xl font-black text-foreground">7</p>
+                  <p className="text-sm text-muted-foreground font-medium">day streak 🔥</p>
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {Array.from({ length: 28 }).map((_, i) => {
+                    const intensity = Math.random();
+                    return (
+                      <div
+                        key={i}
+                        className="aspect-square rounded-sm"
+                        style={{
+                          backgroundColor: intensity > 0.6
+                            ? `hsl(var(--primary) / ${Math.min(intensity, 1)})`
+                            : 'hsl(var(--muted))',
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-2 text-center">Last 28 days</p>
+              </CardContent>
+            </Card>
+          </FadeIn>
+        </div>
       </div>
     </div>
   );
 };
 
-export default DashboardPage;
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEAM DASHBOARD
+// ═══════════════════════════════════════════════════════════════════════════════
+const TeamDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) => {
+  const navigate = useNavigate();
 
+  const pinnedNotes = notes.filter(n => n.isPinned);
+  const recentNotes = [...notes]
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 6);
+
+  const connections = notes.reduce((acc, n) => acc + (n.backlinks?.length || 0), 0);
+
+  const actionVerb = (action: string) => {
+    if (action === 'created') return 'created';
+    if (action === 'edited') return 'edited';
+    if (action === 'pinned') return 'pinned';
+    return action;
+  };
+
+  const getNoteTitle = (noteId: string) => {
+    return notes.find(n => n.id === noteId)?.title || 'Untitled';
+  };
+
+  return (
+    <div className="space-y-8 pb-12">
+      {/* Hero — team specific */}
+      <FadeIn>
+        <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+          <div className="space-y-2">
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-500/80 uppercase tracking-widest">
+              <Users size={10} className="text-blue-500" /> Team Workspace
+            </span>
+            <h1 className="text-4xl font-extrabold tracking-tight text-foreground">
+              {workspace.name}
+            </h1>
+            <div className="flex items-center gap-3">
+              <p className="text-muted-foreground">
+                Collaborative knowledge base
+              </p>
+              <div className="flex -space-x-2">
+                {MOCK_TEAM_MEMBERS.map(m => (
+                  <div
+                    key={m.id}
+                    title={m.name}
+                    className="w-6 h-6 rounded-full border-2 border-background flex items-center justify-center text-[9px] font-bold text-white"
+                    style={{ backgroundColor: m.color }}
+                  >
+                    {m.initials[0]}
+                  </div>
+                ))}
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {MOCK_TEAM_MEMBERS.length} members
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate('/projects')} className="gap-2">
+              <MessageSquare size={15} /> Discussions
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/graph')} className="gap-2 hidden sm:flex">
+              <Share2 size={15} /> Graph
+            </Button>
+            <Button size="sm" onClick={() => navigate('/editor?new=true')} className="gap-2 premium-shadow">
+              <Plus size={15} /> New Note
+            </Button>
+          </div>
+        </header>
+      </FadeIn>
+
+      {/* Team Stats — includes Members */}
+      <FadeIn delay={0.05}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {[
+            { label: 'Shared Notes', value: notes.length, icon: FileText, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+            { label: 'Connections', value: connections, icon: Network, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+            { label: 'Active Tags', value: 5, icon: Hash, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+            { label: 'Members', value: MOCK_TEAM_MEMBERS.length, icon: UserCheck, color: 'text-violet-500', bg: 'bg-violet-500/10' },
+          ].map((stat, i) => (
+            <Card key={i} className="hover:border-primary/30 transition-all cursor-default group">
+              <CardContent className="p-5 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground">{stat.label}</p>
+                  <p className="text-2xl font-bold mt-1 tabular-nums">{stat.value}</p>
+                </div>
+                <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110', stat.bg, stat.color)}>
+                  <stat.icon size={20} />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </FadeIn>
+
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+        {/* Left — shared notes with author attribution */}
+        <div className="lg:col-span-3 space-y-8">
+          
+          {/* Pinned — team notes */}
+          {pinnedNotes.length > 0 && (
+            <FadeIn delay={0.1}>
+              <section>
+                <h2 className="text-lg font-bold flex items-center gap-2 mb-4">
+                  <Star size={18} className="text-amber-500 fill-amber-500" /> Team Pinned
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {pinnedNotes.map(note => (
+                    <Card
+                      key={note.id}
+                      onClick={() => navigate(`/editor?noteId=${note.id}`)}
+                      className="group relative cursor-pointer overflow-hidden hover:border-primary/40 hover:shadow-md transition-all"
+                    >
+                      <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-blue-500 to-violet-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <CardHeader className="p-4 pb-2">
+                        <CardTitle className="text-sm font-bold group-hover:text-primary transition-colors line-clamp-1">
+                          {note.title}
+                        </CardTitle>
+                        <div className="mt-1.5">
+                          <AuthorPill userId={note.userId} />
+                        </div>
+                        <p className="text-xs text-muted-foreground line-clamp-2 mt-1.5">
+                          {note.content.replace(/#+\s/g, '').substring(0, 80)}...
+                        </p>
+                      </CardHeader>
+                      <CardContent className="px-4 pb-3">
+                        <div className="flex items-center justify-between text-[10px] font-bold text-muted-foreground">
+                          <span>Edited {formatDistanceToNow(new Date(note.updatedAt), { addSuffix: true })}</span>
+                          <span className="flex items-center gap-1"><GitBranch size={10} /> {note.versionCount}v</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </section>
+            </FadeIn>
+          )}
+
+          {/* Recent — with author */}
+          <FadeIn delay={0.15}>
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold flex items-center gap-2">
+                  <Clock size={18} className="text-primary" /> Recently Changed
+                </h2>
+                <Button variant="ghost" size="sm" className="text-xs text-primary gap-1" onClick={() => navigate('/editor')}>
+                  ALL <ArrowRight size={13} />
+                </Button>
+              </div>
+              <Card className="overflow-hidden">
+                <div className="divide-y divide-border">
+                  {recentNotes.map(note => {
+                    const author = MOCK_TEAM_MEMBERS.find(m => m.id === note.userId);
+                    return (
+                      <div
+                        key={note.id}
+                        onClick={() => navigate(`/editor?noteId=${note.id}`)}
+                        className="flex items-center gap-4 px-5 py-3.5 hover:bg-accent/50 cursor-pointer group transition-colors"
+                      >
+                        {/* Author avatar */}
+                        <div
+                          className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                          style={{ backgroundColor: author?.color || '#8b5cf6' }}
+                          title={author?.name}
+                        >
+                          {author?.initials || 'U'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold group-hover:text-primary transition-colors truncate">{note.title}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            <span className="font-medium" style={{ color: author?.color }}>
+                              {author?.name}
+                            </span>
+                            {' '}· {formatDistanceToNow(new Date(note.updatedAt), { addSuffix: true })}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[10px] font-mono bg-secondary px-2 py-0.5 rounded-full text-muted-foreground hidden sm:block">
+                            {note.versionCount}v
+                          </span>
+                          <ArrowRight size={14} className="text-muted-foreground/0 group-hover:text-muted-foreground transition-all" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            </section>
+          </FadeIn>
+        </div>
+
+        {/* Right — live team activity feed */}
+        <div className="lg:col-span-2 space-y-6">
+          <FadeIn delay={0.2}>
+            <div>
+              <h2 className="text-lg font-bold flex items-center gap-2 mb-4">
+                <Activity size={18} className="text-primary" /> Team Activity
+              </h2>
+              <Card className="overflow-hidden">
+                <div className="px-5 pt-5 pb-3 relative before:absolute before:left-[28px] before:top-10 before:bottom-4 before:w-px before:bg-border space-y-5">
+                  {mockTeamActivity.map((item, i) => {
+                    const member = MOCK_TEAM_MEMBERS.find(m => m.id === item.authorId);
+                    return (
+                      <div key={i} className="flex gap-4 relative">
+                        <div
+                          className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold text-white border-2 border-background z-10"
+                          style={{ backgroundColor: member?.color || '#8b5cf6' }}
+                        >
+                          {member?.initials || 'U'}
+                        </div>
+                        <div className="flex-1 min-w-0 pt-0.5">
+                          <p className="text-sm leading-relaxed">
+                            <span className="font-bold" style={{ color: member?.color }}>
+                              {member?.name}
+                            </span>
+                            <span className="text-muted-foreground"> {actionVerb(item.action)} </span>
+                            <span
+                              className="font-semibold text-foreground/90 cursor-pointer hover:text-primary transition-colors"
+                              onClick={() => navigate(`/editor?noteId=${item.noteId}`)}
+                            >
+                              {getNoteTitle(item.noteId)}
+                            </span>
+                          </p>
+                          {item.commitMessage && (
+                            <p className="text-[11px] text-muted-foreground mt-0.5 italic truncate">
+                              "{item.commitMessage}"
+                            </p>
+                          )}
+                          <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-wider mt-1">
+                            {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            </div>
+          </FadeIn>
+
+          {/* Member status */}
+          <FadeIn delay={0.25}>
+            <Card>
+              <CardHeader className="p-5 pb-3">
+                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                  <Users size={15} className="text-primary" /> Team Members
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-5 pb-4 space-y-3">
+                {MOCK_TEAM_MEMBERS.map(m => (
+                  <div key={m.id} className="flex items-center gap-3">
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                      style={{ backgroundColor: m.color }}
+                    >
+                      {m.initials[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{m.name}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {m.id === 'u1' ? 'Owner' : 'Contributor'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </FadeIn>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN EXPORT — routes to the right dashboard
+// ═══════════════════════════════════════════════════════════════════════════════
+export const DashboardPage = () => {
+  const allNotes = useNoteStore((state: NoteState) => state.notes);
+  const { workspaces, activeWorkspace: storeActive } = useWorkspaceStore();
+  const activeWorkspace = storeActive || workspaces[0];
+  const isTeam = activeWorkspace?.type === 'team';
+
+  const notes = useMemo(
+    () => allNotes.filter(n => n.workspaceId === activeWorkspace?.id),
+    [allNotes, activeWorkspace]
+  );
+
+  if (!activeWorkspace) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <Activity className="animate-pulse text-primary" size={32} />
+          <p className="text-sm">Loading workspace...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full overflow-y-auto px-6 sm:px-10 pt-8">
+      {isTeam
+        ? <TeamDashboard notes={notes} workspace={activeWorkspace} />
+        : <SoloDashboard notes={notes} workspace={activeWorkspace} />
+      }
+    </div>
+  );
+};
+
+export default DashboardPage;

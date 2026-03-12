@@ -1,139 +1,238 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTagStore } from '../store/useTagStore';
 import { useNoteStore } from '@/features/notes/store/useNoteStore';
-import { Hash, FileText } from 'lucide-react';
+import { Hash, FileText, Plus, X, Trash2, Pencil, ArrowUpDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+import { cn } from '@/shared/utils/cn';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const TAG_COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#84cc16'];
 
 export const TagsPage = () => {
   const { tags, loadTags, isLoading } = useTagStore();
   const notes = useNoteStore(state => state.notes);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    loadTags();
-  }, [loadTags]);
+  const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState<'usage' | 'alpha'>('usage');
+  const [isNewLabelOpen, setIsNewLabelOpen] = useState(false);
+  const [newLabelName, setNewLabelName] = useState('');
+  const [newLabelColor, setNewLabelColor] = useState(TAG_COLORS[0]);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Aggregate tag usage
+  useEffect(() => { loadTags(); }, [loadTags]);
+
   const tagMetrics = useMemo(() => {
-    return tags.map(tag => {
-      const relatedNotes = notes.filter(note => note.tags.includes(tag.name));
-      return {
-        ...tag,
-        usageCount: relatedNotes.length,
-        latestNoteDate: relatedNotes.length > 0 
-          ? Math.max(...relatedNotes.map(n => new Date(n.updatedAt).getTime()))
-          : null
-      };
-    }).sort((a, b) => b.usageCount - a.usageCount);
-  }, [tags, notes]);
+    return tags
+      .map(tag => {
+        const relatedNotes = notes.filter(n => n.tags.includes(tag.name));
+        return { ...tag, usageCount: relatedNotes.length };
+      })
+      .filter(t => t.name.toLowerCase().includes(search.toLowerCase()))
+      .sort((a, b) => sortBy === 'alpha' ? a.name.localeCompare(b.name) : b.usageCount - a.usageCount);
+  }, [tags, notes, search, sortBy]);
 
-  const handleTagClick = (tagName: string) => {
-    navigate(`/editor?tag=${encodeURIComponent(tagName)}`);
+  const handleCreateLabel = () => {
+    if (!newLabelName.trim()) { toast.error('Label name cannot be empty'); return; }
+    toast.success(`Label "${newLabelName}" created`);
+    setNewLabelName('');
+    setNewLabelColor(TAG_COLORS[0]);
+    setIsNewLabelOpen(false);
+  };
+
+  const handleDelete = (name: string) => {
+    toast.success(`Label "${name}" deleted`);
   };
 
   return (
-    <div className="h-full flex flex-col space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10 max-w-5xl mx-auto w-full pt-4">
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-6">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
-              KNOWLEDGE LABELS
+    <div className="h-full overflow-y-auto px-6 sm:px-10 pt-8 pb-12">
+      <div className="max-w-5xl mx-auto">
+
+        {/* Header */}
+        <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+          <div>
+            <span className="text-xs font-bold text-primary/70 uppercase tracking-widest">Knowledge Labels</span>
+            <h1 className="text-4xl font-extrabold tracking-tight text-foreground mt-1">Tags</h1>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Organize your notes into distinct categories.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Hash className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search tags..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-9 pr-3 py-2 bg-background border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all w-44 focus:w-56 placeholder:text-muted-foreground/50"
+              />
+            </div>
+            <button
+              onClick={() => setSortBy(s => s === 'usage' ? 'alpha' : 'usage')}
+              title={`Sort by ${sortBy === 'usage' ? 'name' : 'usage count'}`}
+              className="h-10 w-10 flex items-center justify-center rounded-lg border border-border hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+            >
+              <ArrowUpDown size={16} />
+            </button>
+            <button
+              onClick={() => setIsNewLabelOpen(true)}
+              className="h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors flex items-center gap-2 premium-shadow"
+            >
+              <Plus size={16} /> New Tag
+            </button>
+          </div>
+        </header>
+
+        {/* Tags table */}
+        <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-muted/30 px-5 py-3 border-b border-border flex items-center justify-between">
+            <span className="text-sm font-bold text-foreground">{tagMetrics.length} tags</span>
+            <span className="text-xs text-muted-foreground font-medium">
+              Sorted by: {sortBy === 'alpha' ? 'Alphabetically' : 'Most Used'}
             </span>
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-white flex items-center gap-3">
-            Labels
-          </h1>
-          <p className="text-zinc-500 dark:text-zinc-400 mt-2 max-w-xl text-sm">
-            Labels are applied to notes to help organize and filter your knowledge base.
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-3 w-full md:w-auto">
-           <div className="relative flex-1 md:w-64">
-             <Hash className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
-             <input type="text" placeholder="Search labels..." className="w-full pl-9 pr-3 py-2 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 dark:text-zinc-100 transition-colors" />
-           </div>
-           <button className="h-10 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-sm flex items-center gap-2 text-sm font-semibold shrink-0">
-              New label
-           </button>
-        </div>
-      </header>
 
-      {/* Main Tag Grid */}
-      <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-white dark:bg-zinc-900 shadow-sm">
-        <div className="bg-zinc-50 dark:bg-zinc-950 px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between text-sm font-semibold text-zinc-900 dark:text-white">
-           <span>{tagMetrics.length} labels</span>
-           <span className="text-zinc-500 font-normal">Sort: Alphabetically</span>
-        </div>
-      {isLoading ? (
-        <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-16 bg-white dark:bg-zinc-900 px-4 py-3 animate-pulse">
-              <div className="h-6 w-32 bg-zinc-200 dark:bg-zinc-800 rounded-full"></div>
+          {isLoading ? (
+            <div className="divide-y divide-border">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="h-16 px-5 py-3 animate-pulse flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-muted" />
+                  <div className="h-5 w-28 bg-muted rounded-full" />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      ) : tagMetrics.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50/50 dark:bg-zinc-900/20 p-12 text-center mt-4">
-           <div className="w-16 h-16 rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-4">
-             <Hash className="w-8 h-8 text-zinc-400" />
-           </div>
-           <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-2">No Tags Created</h3>
-           <p className="text-zinc-500 dark:text-zinc-400 max-w-sm">
-             Create tags to start organizing your knowledge into distinct categories.
-           </p>
-        </div>
-      ) : (
-        <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
-          {tagMetrics.map(tag => (
-            <div 
-              key={tag.id} 
-              className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors group"
-            >
-              <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
-                 {/* GitHub Style Pill */}
-                 <button 
-                   onClick={() => handleTagClick(tag.name)}
-                   className="w-fit flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold hover:opacity-80 transition-opacity whitespace-nowrap"
-                   style={{ 
-                     backgroundColor: tag.color.includes('bg-') ? undefined : tag.color, // Fallback if old tailwind classes
-                     border: '1px solid rgba(0,0,0,0.1)'
-                   }}
-                 >
-                   {/* Handle legacy Tailwind colors if present, otherwise assume hex */}
-                   {tag.color.includes('bg-') ? (
-                     <span className={`w-3 h-3 rounded-full ${tag.color}`}></span>
-                   ) : (
-                     <span className="w-3 h-3 rounded-full" style={{ backgroundColor: tag.color }}></span>
-                   )}
-                   <span className={tag.color.includes('bg-') ? "text-zinc-700 dark:text-zinc-300" : ""} style={{ color: tag.color.includes('bg-') ? undefined : tag.color }}>
-                     {tag.name}
-                   </span>
-                 </button>
-
-                 <p className="text-sm text-zinc-500 dark:text-zinc-400 truncate hidden md:block">
-                   Knowledge organization tag for {tag.name}-related notes.
-                 </p>
-              </div>
-              
-              <div className="flex items-center gap-6 shrink-0 text-sm">
-                 <button 
-                   onClick={() => handleTagClick(tag.name)}
-                   className="text-zinc-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium flex items-center gap-1"
-                 >
-                   <FileText size={14} /> {tag.usageCount} {tag.usageCount === 1 ? 'note' : 'notes'}
-                 </button>
-
-                 <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                   <button className="text-zinc-500 hover:text-zinc-900 dark:hover:text-white transition-colors font-medium">Edit</button>
-                   <button className="text-zinc-500 hover:text-red-600 dark:hover:text-red-400 transition-colors font-medium">Delete</button>
-                 </div>
-              </div>
+          ) : tagMetrics.length === 0 ? (
+            <div className="flex flex-col items-center py-16 text-muted-foreground/40 gap-3">
+              <Hash size={40} />
+              <p className="font-medium">{search ? 'No tags match your search' : 'No tags yet'}</p>
+              {!search && <button onClick={() => setIsNewLabelOpen(true)} className="text-sm text-primary font-semibold hover:underline">Create your first tag</button>}
             </div>
-          ))}
+          ) : (
+            <div className="divide-y divide-border">
+              {tagMetrics.map(tag => (
+                <div
+                  key={tag.id}
+                  className="px-5 py-3.5 flex items-center justify-between gap-4 hover:bg-accent/40 transition-colors group"
+                >
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <button
+                      onClick={() => navigate(`/editor?tag=${encodeURIComponent(tag.name)}`)}
+                      className="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold hover:opacity-80 transition-opacity shrink-0"
+                      style={{ backgroundColor: tag.color + '20', color: tag.color, border: `1px solid ${tag.color}40` }}
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: tag.color }} />
+                      {tag.name}
+                    </button>
+                    <p className="text-sm text-muted-foreground truncate hidden md:block">
+                      Knowledge label for {tag.name}-related notes.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-4 shrink-0">
+                    <button
+                      onClick={() => navigate(`/editor?tag=${encodeURIComponent(tag.name)}`)}
+                      className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors font-medium"
+                    >
+                      <FileText size={14} />
+                      {tag.usageCount} {tag.usageCount === 1 ? 'note' : 'notes'}
+                    </button>
+
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => { setNewLabelName(tag.name); setNewLabelColor(tag.color); setEditingId(tag.id); setIsNewLabelOpen(true); }}
+                        className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
+                        title="Edit tag"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(tag.name)}
+                        className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                        title="Delete tag"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
       </div>
+
+      {/* Create / Edit Tag Modal */}
+      <AnimatePresence>
+        {isNewLabelOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl overflow-hidden"
+            >
+              <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-border">
+                <h3 className="font-bold text-foreground">{editingId ? 'Edit Tag' : 'New Tag'}</h3>
+                <button
+                  onClick={() => { setIsNewLabelOpen(false); setEditingId(null); setNewLabelName(''); }}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="p-5 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-muted-foreground mb-2 uppercase tracking-widest">Tag Name</label>
+                  <input
+                    autoFocus
+                    type="text"
+                    value={newLabelName}
+                    onChange={e => setNewLabelName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleCreateLabel()}
+                    placeholder="e.g. machine-learning"
+                    className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-muted-foreground mb-2 uppercase tracking-widest">Color</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {TAG_COLORS.map(c => (
+                      <button
+                        key={c}
+                        onClick={() => setNewLabelColor(c)}
+                        className={cn('w-7 h-7 rounded-full transition-all', newLabelColor === c && 'ring-2 ring-offset-2 ring-offset-card ring-foreground')}
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="px-3 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: newLabelColor + '20', color: newLabelColor, border: `1px solid ${newLabelColor}40` }}>
+                    {newLabelName || 'preview'}
+                  </span>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => { setIsNewLabelOpen(false); setEditingId(null); setNewLabelName(''); }}
+                    className="flex-1 py-2 rounded-lg bg-accent text-foreground text-sm font-semibold hover:bg-accent/70 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleCreateLabel}
+                    className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+                  >
+                    {editingId ? 'Save Changes' : 'Create Tag'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

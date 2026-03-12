@@ -84,15 +84,11 @@
   }
 }
 
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* ── Hide all scrollbars everywhere ── */
+* {
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* IE / old Edge */
 }
-
-::-webkit-scrollbar-track {
-  @apply bg-transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/30 transition-colors;
+*::-webkit-scrollbar {
+  display: none;               /* Chrome, Safari, Edge */
 }

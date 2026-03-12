@@ -1,29 +1,55 @@
-import { Sun, Moon, Bell, Search, Monitor } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Sun, Moon, Bell, Search, X, Settings, LogOut, User, ChevronRight } from 'lucide-react';
 import { useThemeStore } from '@/shared/store/useThemeStore';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/shared/utils/cn';
+import { useNavigate } from 'react-router-dom';
+import { formatDistanceToNow } from 'date-fns';
+
+const MOCK_NOTIFICATIONS = [
+  { id: '1', type: 'comment', text: 'Alex Johnson commented on "Q1 Research Roadmap"', time: new Date(Date.now() - 3600000 * 1), read: false  },
+  { id: '2', type: 'mention', text: 'Sarah Chen mentioned you in "Dataset Curation Guide"', time: new Date(Date.now() - 3600000 * 3), read: false },
+  { id: '3', type: 'version', text: '"Evaluation Framework" was updated with a new commit', time: new Date(Date.now() - 86400000 * 1), read: true  },
+  { id: '4', type: 'version', text: '"Q1 Research Roadmap" pinned by Alex Johnson', time: new Date(Date.now() - 86400000 * 2), read: true },
+];
 
 export const Header = ({ onOpenCommand }: { onOpenCommand: () => void }) => {
-  const { isDarkMode, themeMode, setTheme } = useThemeStore();
-  const user = useAuthStore((state) => state.user);
+  const { isDarkMode, setTheme } = useThemeStore();
+  const { user, logout } = useAuthStore();
+  const navigate = useNavigate();
+
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [userOpen, setUserOpen] = useState(false);
+  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+  const notifRef = useRef<HTMLDivElement>(null);
+  const userRef = useRef<HTMLDivElement>(null);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+      if (userRef.current && !userRef.current.contains(e.target as Node)) setUserOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const markAllRead = () => setNotifications(n => n.map(x => ({ ...x, read: true })));
 
   const mockPresence = [
-    { id: 'u2', initial: 'A', color: 'bg-blue-500' },
-    { id: 'u3', initial: 'S', color: 'bg-emerald-500' },
+    { id: 'u2', initial: 'A', color: '#3b82f6' },
+    { id: 'u3', initial: 'S', color: '#10b981' },
   ];
-
-  const cycleTheme = () => {
-    const next = isDarkMode ? 'light' : 'dark';
-    setTheme(next);
-  };
 
   return (
     <motion.header
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.25, ease: 'easeOut' }}
-      className="h-14 bg-card border-b border-border flex items-center justify-between px-4 sm:px-6 transition-colors z-20 shrink-0"
+      className="h-14 bg-card border-b border-border flex items-center justify-between px-4 sm:px-6 transition-colors z-20 shrink-0 relative"
     >
       {/* Search Bar */}
       <div className="flex-1 max-w-md hidden sm:block">
@@ -40,16 +66,15 @@ export const Header = ({ onOpenCommand }: { onOpenCommand: () => void }) => {
       </div>
 
       <div className="flex items-center gap-1.5 sm:gap-2 ml-auto">
-        {/* Real-time presence */}
+
+        {/* Live presence */}
         <div className="hidden md:flex items-center gap-3 mr-2">
           <div className="flex -space-x-2">
-            {mockPresence.map((p) => (
+            {mockPresence.map(p => (
               <div
                 key={p.id}
-                className={cn(
-                  'w-7 h-7 rounded-full border-2 border-card flex items-center justify-center text-[10px] font-bold text-white',
-                  p.color
-                )}
+                className="w-7 h-7 rounded-full border-2 border-card flex items-center justify-center text-[10px] font-bold text-white"
+                style={{ backgroundColor: p.color }}
               >
                 {p.initial}
               </div>
@@ -69,30 +94,144 @@ export const Header = ({ onOpenCommand }: { onOpenCommand: () => void }) => {
 
         {/* Theme toggle */}
         <button
-          onClick={cycleTheme}
+          onClick={() => setTheme(isDarkMode ? 'light' : 'dark')}
           className="p-2 text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg transition-colors"
-          aria-label="Toggle theme"
           title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
         >
           {isDarkMode ? <Sun size={17} /> : <Moon size={17} />}
         </button>
 
         {/* Notifications */}
-        <button className="p-2 text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg transition-colors relative">
-          <Bell size={17} />
-          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-destructive" />
-        </button>
+        <div ref={notifRef} className="relative">
+          <button
+            onClick={() => { setNotifOpen(v => !v); setUserOpen(false); }}
+            className="p-2 text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg transition-colors relative"
+            title="Notifications"
+          >
+            <Bell size={17} />
+            {unreadCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-destructive text-[9px] font-bold text-white flex items-center justify-center">
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          <AnimatePresence>
+            {notifOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                transition={{ duration: 0.13 }}
+                className="absolute right-0 top-full mt-2 w-80 bg-popover border border-border rounded-xl shadow-2xl overflow-hidden z-50"
+              >
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                  <h3 className="font-bold text-sm text-foreground">Notifications</h3>
+                  <div className="flex items-center gap-2">
+                    {unreadCount > 0 && (
+                      <button onClick={markAllRead} className="text-[11px] text-primary font-semibold hover:underline">
+                        Mark all read
+                      </button>
+                    )}
+                    <button onClick={() => setNotifOpen(false)} className="text-muted-foreground hover:text-foreground">
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+                <div className="divide-y divide-border max-h-72 overflow-y-auto">
+                  {notifications.map(notif => (
+                    <div
+                      key={notif.id}
+                      onClick={() => setNotifications(n => n.map(x => x.id === notif.id ? { ...x, read: true } : x))}
+                      className={cn(
+                        'px-4 py-3 cursor-pointer hover:bg-accent/50 transition-colors',
+                        !notif.read && 'bg-primary/5'
+                      )}
+                    >
+                      <div className="flex items-start gap-2">
+                        {!notif.read && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0 mt-1.5" />}
+                        <div className={cn('flex-1', notif.read && 'pl-3.5')}>
+                          <p className="text-[12px] text-foreground leading-relaxed">{notif.text}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1 font-medium">
+                            {formatDistanceToNow(notif.time, { addSuffix: true })}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="px-4 py-2.5 border-t border-border">
+                  <button className="text-xs text-primary font-semibold hover:underline w-full text-center">
+                    View all notifications
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         <div className="w-px h-5 bg-border mx-0.5" />
 
-        {/* User avatar */}
-        <div className="flex items-center gap-2 cursor-pointer hover:bg-accent rounded-lg px-2 py-1.5 transition-colors">
-          <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-xs border border-primary/30">
-            {user?.email?.charAt(0).toUpperCase() || 'U'}
-          </div>
-          <span className="text-sm font-medium text-foreground hidden md:block">
-            {user?.name || user?.email?.split('@')[0] || 'User'}
-          </span>
+        {/* User menu */}
+        <div ref={userRef} className="relative">
+          <button
+            onClick={() => { setUserOpen(v => !v); setNotifOpen(false); }}
+            className="flex items-center gap-2 cursor-pointer hover:bg-accent rounded-lg px-2 py-1.5 transition-colors"
+            title="Account menu"
+          >
+            <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-xs border border-primary/30">
+              {user?.email?.charAt(0).toUpperCase() || 'U'}
+            </div>
+            <span className="text-sm font-medium text-foreground hidden md:block">
+              {user?.name || user?.email?.split('@')[0] || 'User'}
+            </span>
+          </button>
+
+          <AnimatePresence>
+            {userOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                transition={{ duration: 0.13 }}
+                className="absolute right-0 top-full mt-2 w-56 bg-popover border border-border rounded-xl shadow-2xl overflow-hidden z-50"
+              >
+                {/* User info */}
+                <div className="px-4 py-3 border-b border-border">
+                  <p className="text-sm font-semibold text-foreground">
+                    {user?.name || user?.email?.split('@')[0] || 'User'}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                </div>
+
+                {[
+                  { label: 'Profile', icon: User, action: () => { navigate('/settings'); setUserOpen(false); } },
+                  { label: 'Settings', icon: Settings, action: () => { navigate('/settings'); setUserOpen(false); } },
+                ].map(item => (
+                  <button
+                    key={item.label}
+                    onClick={item.action}
+                    className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <item.icon size={15} className="text-muted-foreground" />
+                      {item.label}
+                    </div>
+                    <ChevronRight size={13} className="text-muted-foreground/0 group-hover:text-muted-foreground transition-colors" />
+                  </button>
+                ))}
+
+                <div className="h-px bg-border my-1" />
+                <button
+                  onClick={() => { logout(); setUserOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                >
+                  <LogOut size={15} />
+                  Sign out
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </motion.header>
