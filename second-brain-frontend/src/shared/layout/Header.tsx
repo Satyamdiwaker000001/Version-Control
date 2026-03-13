@@ -231,8 +231,8 @@ export const Header = ({
                 </div>
 
                 {[
-                  { label: 'Profile', icon: User, action: () => { navigate('/settings'); setUserOpen(false); } },
-                  { label: 'Settings', icon: Settings, action: () => { navigate('/settings'); setUserOpen(false); } },
+                  { label: 'Profile', icon: User, action: () => { navigate('/settings/profile'); setUserOpen(false); } },
+                  { label: 'Settings', icon: Settings, action: () => { navigate('/settings/appearance'); setUserOpen(false); } },
                 ].map(item => (
                   <button
                     key={item.label}

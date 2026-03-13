@@ -78,13 +78,7 @@ export const AIPanel = ({ noteId }: { noteId: string }) => {
   const [isThinking, setIsThinking] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Reset state when note changes
-  useEffect(() => {
-    setSummary(null);
-    setToneResult(null);
-    setMessages([]);
-    setInput('');
-  }, [noteId]);
+  // State reset is handled by key prop in parent (NoteEditorPage.tsx)
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });

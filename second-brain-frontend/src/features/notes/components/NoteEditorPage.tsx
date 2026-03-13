@@ -89,6 +89,7 @@ export const NoteEditorPage = () => {
         </div>
 
         <NoteEditor
+          key={currentNoteId}
           noteId={currentNoteId}
           onSelectNote={handleSelectNote}
           onTogglePanel={() => setRightPanelOpen(v => !v)}
@@ -104,7 +105,7 @@ export const NoteEditorPage = () => {
           </div>
           <div className="h-px bg-border" />
           <div className="flex-1 min-h-[30%] overflow-hidden">
-            <AIPanel noteId={currentNoteId} />
+            <AIPanel key={currentNoteId} noteId={currentNoteId} />
           </div>
         </div>
       )}
@@ -127,7 +128,7 @@ export const NoteEditorPage = () => {
             <div className="flex-1 overflow-y-auto">
               <NoteMetadataPanel noteId={currentNoteId} />
               <div className="h-px bg-border my-4" />
-              <AIPanel noteId={currentNoteId} />
+              <AIPanel key={currentNoteId} noteId={currentNoteId} />
             </div>
           </motion.div>
         )}

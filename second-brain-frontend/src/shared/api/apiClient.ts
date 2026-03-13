@@ -59,13 +59,9 @@ export async function apiCall<T = any>(
   url: string,
   data?: any
 ): Promise<T> {
-  try {
-    const response = await apiClient[method]<ApiResponse<T>>(url, data);
-    if (response.data.success && response.data.data) {
-      return response.data.data;
-    }
-    throw new Error(response.data.message || 'Unknown error');
-  } catch (error: any) {
-    throw error;
+  const response = await apiClient[method]<ApiResponse<T>>(url, data);
+  if (response.data.success && response.data.data) {
+    return response.data.data;
   }
+  throw new Error(response.data.message || 'Unknown error');
 }

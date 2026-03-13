@@ -24,6 +24,8 @@ export interface NoteState {
   getNoteVersions: (noteId: string) => NodeVersion[];
   fetchNoteHistory: (workspaceId: string, slug: string, token: string) => Promise<void>;
   togglePin: (id: string) => void;
+  addTag: (id: string, tag: string) => void;
+  removeTag: (id: string, tag: string) => void;
 }
 
 // ─── Mock authors for team workspace ─────────────────────────────────────────
@@ -158,8 +160,9 @@ export const useNoteStore = create<NoteState>((set, get) => ({
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const newVersions: NodeVersion[] = res.data.history.map((h: any) => ({
-        id: h.sha, noteId: slug, content: '',
-        timestamp: h.date, authorId: h.author, message: h.message,
+        versionId: h.sha, noteId: slug, content: '',
+        createdAt: h.date, author: { id: h.author, name: h.author, email: '', createdAt: h.date }, 
+        commitMessage: h.message,
       }));
       set((state) => ({
         versions: [...state.versions.filter(v => v.noteId !== slug), ...newVersions],
@@ -171,5 +174,21 @@ export const useNoteStore = create<NoteState>((set, get) => ({
 
   togglePin: (id) => set((state) => ({
     notes: state.notes.map(n => n.id === id ? { ...n, isPinned: !n.isPinned } : n),
+  })),
+
+  addTag: (id, tag) => set((state) => ({
+    notes: state.notes.map(n => 
+      n.id === id && !n.tags.includes(tag) 
+        ? { ...n, tags: [...n.tags, tag], updatedAt: new Date().toISOString() } 
+        : n
+    ),
+  })),
+
+  removeTag: (id, tag) => set((state) => ({
+    notes: state.notes.map(n => 
+      n.id === id 
+        ? { ...n, tags: n.tags.filter(t => t !== tag), updatedAt: new Date().toISOString() } 
+        : n
+    ),
   })),
 }));

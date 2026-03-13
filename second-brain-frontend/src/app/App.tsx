@@ -91,7 +91,7 @@ function App() {
             <Route path="/repository/:id/commits" element={<CommitTimelinePage />} />
             <Route path="/tags" element={<TagsPage />} />
             <Route path="/projects" element={<ProjectPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/settings/:tab?" element={<SettingsPage />} />
           </Route>
         </Routes>
       </Router>

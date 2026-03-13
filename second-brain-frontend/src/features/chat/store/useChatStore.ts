@@ -26,6 +26,7 @@ interface ChatState {
   setChatOpen: (isOpen: boolean) => void;
   setActiveChannel: (channelId: string) => void;
   sendMessage: (workspaceId: string, channelId: string, content: string) => void;
+  createChannel: (workspaceId: string, name: string, description?: string) => void;
 }
 
 // Initial mock data
@@ -75,5 +76,14 @@ export const useChatStore = create<ChatState>((set) => ({
     };
     
     set((state) => ({ messages: [...state.messages, newMessage] }));
+  },
+  createChannel: (workspaceId, name, description) => {
+    const newChannel: Channel = {
+      id: `c_${Date.now()}`,
+      workspaceId,
+      name,
+      description
+    };
+    set((state) => ({ channels: [...state.channels, newChannel], activeChannelId: newChannel.id }));
   }
 }));
