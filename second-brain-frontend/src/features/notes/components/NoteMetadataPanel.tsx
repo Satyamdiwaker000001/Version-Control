@@ -5,9 +5,8 @@ import {
   Hash, Link2, GitCommit, ChevronDown, ChevronRight,
   Activity, Pin, ExternalLink, Plus, Clock,
 } from 'lucide-react';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { VersionDiffViewer } from '@/features/notes/components/VersionDiffViewer';
-import { cn } from '@/shared/utils/cn';
 
 interface SectionProps {
   label: string;
@@ -70,7 +69,7 @@ export const NoteMetadataPanel = ({ noteId }: { noteId: string }) => {
   }));
 
   return (
-    <div className="w-64 bg-card flex flex-col h-full overflow-y-auto">
+    <div className="bg-card flex flex-col h-full overflow-y-auto">
 
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-border">

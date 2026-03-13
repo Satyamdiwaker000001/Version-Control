@@ -7,7 +7,6 @@ import {
   Hash, 
   Share2,
   Kanban,
-  Network,
   ChevronDown,
   Plus,
   X,

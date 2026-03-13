@@ -65,23 +65,23 @@ const SoloDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) 
     <div className="space-y-8 pb-12">
       {/* Hero */}
       <FadeIn>
-        <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-2">
             <span className="inline-flex items-center gap-1.5 text-xs font-bold text-primary/70 uppercase tracking-widest">
               <CircleDot size={10} className="text-primary" /> Personal Space
             </span>
-            <h1 className="text-4xl font-extrabold tracking-tight text-foreground">
+            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground">
               {workspace.name}
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-sm sm:text-base text-muted-foreground max-w-2xl">
               Your private knowledge garden. Write, explore, grow.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigate('/graph')} className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate('/graph')} className="flex-1 sm:flex-none gap-2">
               <Share2 size={15} /> Graph
             </Button>
-            <Button size="sm" onClick={() => navigate('/editor?new=true')} className="gap-2 premium-shadow">
+            <Button size="sm" onClick={() => navigate('/editor?new=true')} className="flex-1 sm:flex-none gap-2 premium-shadow">
               <Plus size={15} /> New Note
             </Button>
           </div>
@@ -308,16 +308,16 @@ const TeamDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) 
     <div className="space-y-8 pb-12">
       {/* Hero — team specific */}
       <FadeIn>
-        <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-6">
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-2">
             <span className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-500/80 uppercase tracking-widest">
               <Users size={10} className="text-blue-500" /> Team Workspace
             </span>
-            <h1 className="text-4xl font-extrabold tracking-tight text-foreground">
+            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground">
               {workspace.name}
             </h1>
-            <div className="flex items-center gap-3">
-              <p className="text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm text-muted-foreground">
                 Collaborative knowledge base
               </p>
               <div className="flex -space-x-2">
@@ -325,26 +325,26 @@ const TeamDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) 
                   <div
                     key={m.id}
                     title={m.name}
-                    className="w-6 h-6 rounded-full border-2 border-background flex items-center justify-center text-[9px] font-bold text-white"
+                    className="w-6 h-6 rounded-full border-2 border-background flex items-center justify-center text-[9px] font-bold text-white shrink-0"
                     style={{ backgroundColor: m.color }}
                   >
                     {m.initials[0]}
                   </div>
                 ))}
               </div>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-[11px] font-medium text-muted-foreground">
                 {MOCK_TEAM_MEMBERS.length} members
               </span>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigate('/projects')} className="gap-2">
-              <MessageSquare size={15} /> Discussions
+            <Button variant="outline" size="sm" onClick={() => navigate('/projects')} className="flex-1 sm:flex-none gap-2">
+              <MessageSquare size={15} /> Chat
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/graph')} className="gap-2 hidden sm:flex">
+            <Button variant="outline" size="sm" onClick={() => navigate('/graph')} className="flex-1 sm:flex-none gap-2 hidden sm:flex">
               <Share2 size={15} /> Graph
             </Button>
-            <Button size="sm" onClick={() => navigate('/editor?new=true')} className="gap-2 premium-shadow">
+            <Button size="sm" onClick={() => navigate('/editor?new=true')} className="flex-1 sm:flex-none gap-2 premium-shadow">
               <Plus size={15} /> New Note
             </Button>
           </div>
@@ -586,7 +586,7 @@ export const DashboardPage = () => {
   }
 
   return (
-    <div className="h-full overflow-y-auto px-6 sm:px-10 pt-8">
+    <div className="h-full overflow-y-auto px-4 sm:px-6 lg:px-10 pt-6 sm:pt-8 pb-10">
       {isTeam
         ? <TeamDashboard notes={notes} workspace={activeWorkspace} />
         : <SoloDashboard notes={notes} workspace={activeWorkspace} />

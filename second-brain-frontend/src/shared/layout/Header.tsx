@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Sun, Moon, Bell, Search, X, Settings, LogOut, User, ChevronRight } from 'lucide-react';
+import { Sun, Moon, Bell, Search, X, Settings, LogOut, User, ChevronRight, Menu } from 'lucide-react';
 import { useThemeStore } from '@/shared/store/useThemeStore';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -14,7 +14,13 @@ const MOCK_NOTIFICATIONS = [
   { id: '4', type: 'version', text: '"Q1 Research Roadmap" pinned by Alex Johnson', time: new Date(Date.now() - 86400000 * 2), read: true },
 ];
 
-export const Header = ({ onOpenCommand }: { onOpenCommand: () => void }) => {
+export const Header = ({ 
+  onOpenCommand, 
+  onToggleMobileSidebar 
+}: { 
+  onOpenCommand: () => void;
+  onToggleMobileSidebar: () => void;
+}) => {
   const { isDarkMode, setTheme } = useThemeStore();
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
@@ -51,17 +57,37 @@ export const Header = ({ onOpenCommand }: { onOpenCommand: () => void }) => {
       transition={{ duration: 0.25, ease: 'easeOut' }}
       className="h-14 bg-card border-b border-border flex items-center justify-between px-4 sm:px-6 transition-colors z-20 shrink-0 relative"
     >
-      {/* Search Bar */}
-      <div className="flex-1 max-w-md hidden sm:block">
+      <div className="flex items-center gap-3">
+        {/* Mobile menu toggle */}
+        <button
+          onClick={onToggleMobileSidebar}
+          className="lg:hidden p-2 -ml-2 text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg transition-colors"
+          title="Open menu"
+        >
+          <Menu size={20} />
+        </button>
+
+        {/* Search Bar */}
+        <div className="flex-1 max-w-md hidden md:block">
+          <button
+            onClick={onOpenCommand}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-border bg-background/50 hover:bg-accent text-muted-foreground hover:text-foreground transition-all text-sm group"
+          >
+            <Search size={15} className="shrink-0" />
+            <span className="flex-1 text-left line-clamp-1">Search notes, commands...</span>
+            <kbd className="hidden sm:flex items-center gap-1 rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium shrink-0">
+              <span>⌘</span>K
+            </kbd>
+          </button>
+        </div>
+
+        {/* Mobile Search Icon */}
         <button
           onClick={onOpenCommand}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-border bg-background/50 hover:bg-accent text-muted-foreground hover:text-foreground transition-all text-sm group"
+          className="md:hidden p-2 text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg transition-colors"
+          title="Search"
         >
-          <Search size={15} className="shrink-0" />
-          <span className="flex-1 text-left">Search notes, commands...</span>
-          <kbd className="hidden sm:flex items-center gap-1 rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium">
-            <span>⌘</span>K
-          </kbd>
+          <Search size={18} />
         </button>
       </div>
 
@@ -123,7 +149,7 @@ export const Header = ({ onOpenCommand }: { onOpenCommand: () => void }) => {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -8, scale: 0.96 }}
                 transition={{ duration: 0.13 }}
-                className="absolute right-0 top-full mt-2 w-80 bg-popover border border-border rounded-xl shadow-2xl overflow-hidden z-50"
+                className="absolute right-0 top-full mt-2 w-[calc(100vw-32px)] sm:w-80 max-w-sm bg-popover border border-border rounded-xl shadow-2xl overflow-hidden z-50"
               >
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                   <h3 className="font-bold text-sm text-foreground">Notifications</h3>
@@ -138,7 +164,7 @@ export const Header = ({ onOpenCommand }: { onOpenCommand: () => void }) => {
                     </button>
                   </div>
                 </div>
-                <div className="divide-y divide-border max-h-72 overflow-y-auto">
+                <div className="divide-y divide-border max-h-[60vh] overflow-y-auto">
                   {notifications.map(notif => (
                     <div
                       key={notif.id}

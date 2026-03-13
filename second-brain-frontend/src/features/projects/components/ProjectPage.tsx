@@ -47,43 +47,43 @@ export const ProjectPage = () => {
     <div className="flex-1 flex flex-col h-full overflow-hidden animate-in fade-in duration-700">
       
       {/* Project Header */}
-      <header className="px-8 py-6 border-b border-border bg-background/50 backdrop-blur-sm sticky top-0 z-20">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <header className="px-4 sm:px-8 py-4 sm:py-6 border-b border-border bg-background/50 backdrop-blur-sm sticky top-0 z-20">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6">
           <div className="space-y-1">
-             <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-primary">
+             <div className="flex items-center gap-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-primary">
                 <Github size={12} /> REPOSITORY CONNECTED
              </div>
-             <h1 className="text-3xl font-extrabold tracking-tight flex items-center gap-3">
-               {activeProject.name} <ChevronDown size={20} className="text-muted-foreground cursor-pointer" />
+             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight flex items-center gap-3">
+               {activeProject.name} <ChevronDown size={18} className="text-muted-foreground cursor-pointer shrink-0" />
              </h1>
-             <p className="text-muted-foreground text-sm max-w-2xl">{activeProject.description}</p>
+             <p className="text-muted-foreground text-xs sm:text-sm max-w-2xl">{activeProject.description}</p>
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" className="gap-2"><Plus size={16} /> New Issue</Button>
-            <Button size="sm" className="premium-shadow">Invite Team</Button>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Button variant="outline" size="sm" className="flex-1 sm:flex-none gap-2 py-1.5 h-auto text-xs"><Plus size={14} /> Issue</Button>
+            <Button size="sm" className="flex-1 sm:flex-none premium-shadow py-1.5 h-auto text-xs">Invite Team</Button>
           </div>
         </div>
 
         {/* View Switcher Tabs */}
-        <div className="flex items-center gap-8 mt-8">
+        <div className="flex items-center gap-6 sm:gap-8 mt-6 sm:mt-8 no-scrollbar overflow-x-auto">
            <button 
              onClick={() => setView('kanban')}
              className={cn(
-               "flex items-center gap-2 text-sm font-bold pb-2 border-b-2 transition-all",
+               "flex items-center gap-2 text-xs sm:text-sm font-bold pb-2 border-b-2 transition-all whitespace-nowrap",
                view === 'kanban' ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
              )}
            >
-             <Kanban size={16} /> Board
+             <Kanban size={15} /> Board
            </button>
            <button 
              onClick={() => setView('discussions')}
              className={cn(
-               "flex items-center gap-2 text-sm font-bold pb-2 border-b-2 transition-all",
+               "flex items-center gap-2 text-xs sm:text-sm font-bold pb-2 border-b-2 transition-all whitespace-nowrap",
                view === 'discussions' ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
              )}
            >
-             <MessageSquare size={16} /> Discussions
-             <span className="bg-secondary px-2 py-0.5 rounded-full text-[10px]">{activeProject.discussions.length}</span>
+             <MessageSquare size={15} /> Discussions
+             <span className="bg-secondary px-2 py-0.5 rounded-full text-[9px] sm:text-[10px]">{activeProject.discussions.length}</span>
            </button>
         </div>
       </header>
@@ -110,10 +110,10 @@ const KanbanBoard = ({ tasks }: { tasks: ProjectTask[] }) => {
   ];
 
   return (
-    <div className="h-full overflow-x-auto custom-scrollbar p-8">
-      <div className="flex gap-6 min-h-full">
+    <div className="h-full overflow-x-auto no-scrollbar p-4 sm:p-8">
+      <div className="flex gap-4 sm:gap-6 min-h-full">
         {columns.map(col => (
-          <div key={col.id} className="w-80 shrink-0 flex flex-col gap-4">
+          <div key={col.id} className="w-72 sm:w-80 shrink-0 flex flex-col gap-4">
             <div className="flex items-center justify-between px-2">
               <div className="flex items-center gap-2">
                  <col.icon size={16} className={col.color} />
@@ -172,23 +172,23 @@ const KanbanBoard = ({ tasks }: { tasks: ProjectTask[] }) => {
 
 const DiscussionList = ({ discussions }: { discussions: ProjectDiscussion[] }) => {
   return (
-    <div className="h-full overflow-y-auto custom-scrollbar p-8 max-w-5xl mx-auto">
+    <div className="h-full overflow-y-auto no-scrollbar p-4 sm:p-8 max-w-5xl mx-auto">
       <div className="space-y-6">
-         <div className="flex items-center justify-between mb-8">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-               <MessageSquare size={20} className="text-primary" /> General Discussions
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+            <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
+               <MessageSquare size={18} className="text-primary" /> Discussions
             </h2>
             <div className="flex items-center gap-2">
-               <div className="relative">
+               <div className="relative flex-1 sm:flex-none">
                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                  <input 
-                   placeholder="Search discussions..." 
-                   className="h-9 pl-9 pr-3 text-xs bg-accent/50 border-none rounded-lg w-64 focus:ring-1 focus:ring-primary/20 outline-none"
+                   placeholder="Search..." 
+                   className="h-9 pl-9 pr-3 text-xs bg-accent/50 border-none rounded-lg w-full sm:w-48 lg:w-64 focus:ring-1 focus:ring-primary/20 outline-none"
                  />
                </div>
-               <Button size="sm" className="premium-shadow">Start Thread</Button>
+               <Button size="sm" className="premium-shadow shrink-0">New Thread</Button>
             </div>
-         </div>
+          </div>
 
          <div className="bg-card border border-border rounded-2xl overflow-hidden divide-y divide-border">
             {discussions.map(discussion => (

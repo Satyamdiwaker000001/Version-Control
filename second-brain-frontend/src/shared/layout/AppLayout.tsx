@@ -67,7 +67,7 @@ export const AppLayout = () => {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header
           onOpenCommand={() => setIsCommandOpen(true)}
-          onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+          onToggleMobileSidebar={() => setIsMobileSidebarOpen(v => !v)}
         />
         <main className="flex-1 overflow-y-auto w-full p-3 sm:p-5 lg:p-8 2xl:p-10 relative">
           <div className="max-w-screen-2xl mx-auto h-full">

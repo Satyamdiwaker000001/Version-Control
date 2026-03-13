@@ -5,11 +5,14 @@ import { useTagStore } from '@/features/tags/store/useTagStore';
 import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
 import {
   FileText, ChevronDown, ChevronRight, Plus, Search,
-  Hash, ArrowDownAZ, Calendar, Star,
+  Hash, ArrowDownAZ, Calendar, Star, MoreHorizontal,
+  Trash2, Edit3,
 } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
 import { Button } from '@/shared/ui/Button';
+import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
+import { Note } from '@/shared/types';
 
 interface NoteTreeProps {
   onSelectNote: (id: string) => void;
@@ -63,16 +66,35 @@ export const NoteTree = ({ onSelectNote, selectedId }: NoteTreeProps) => {
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
   };
 
-  const NoteItem = ({ note }: { note: ReturnType<typeof filteredNotes[0]['valueOf']> }) => {
+  const NoteItem = ({ note }: { note: Note }) => {
     const isActive = selectedId === note.id;
     const activity = isTeam ? getLastActivity(note.id) : null;
     const author = isTeam ? MOCK_TEAM_MEMBERS.find(m => m.id === note.userId) : null;
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+    const handleDelete = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (confirm('Delete this note?')) {
+        useNoteStore.getState().deleteNote(note.id);
+        toast.success('Note deleted');
+      }
+    };
+
+    const handleRename = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const newTitle = prompt('Enter new title:', note.title);
+      if (newTitle && newTitle !== note.title) {
+        useNoteStore.getState().renameNote(note.id, newTitle);
+        toast.success('Note renamed');
+      }
+      setIsMenuOpen(false);
+    };
 
     return (
       <div
         onClick={() => onSelectNote(note.id)}
         className={cn(
-          'flex flex-col px-3 py-2 rounded-lg cursor-pointer transition-all group',
+          'flex flex-col px-3 py-2 rounded-lg cursor-pointer transition-all group relative',
           isActive
             ? 'bg-primary/10 text-foreground'
             : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
@@ -89,8 +111,36 @@ export const NoteTree = ({ onSelectNote, selectedId }: NoteTreeProps) => {
           <span className={cn('text-sm truncate flex-1', isActive && 'font-semibold')}>
             {note.title}
           </span>
-          {isActive && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
+          
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+               onClick={(e) => { e.stopPropagation(); setIsMenuOpen(!isMenuOpen); }}
+               className="p-1 hover:bg-accent rounded text-muted-foreground transition-colors"
+            >
+              <MoreHorizontal size={12} />
+            </button>
+          </div>
+
+          {isActive && !isMenuOpen && <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />}
         </div>
+
+        {/* Menu Overlay */}
+        {isMenuOpen && (
+          <div className="absolute right-2 top-8 z-50 bg-card border border-border shadow-xl rounded-lg py-1 min-w-[120px] animate-in fade-in zoom-in duration-100">
+             <button 
+               onClick={handleRename}
+               className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] hover:bg-accent transition-colors text-left"
+             >
+               <Edit3 size={12} /> Rename
+             </button>
+             <button 
+               onClick={handleDelete}
+               className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] hover:bg-destructive/10 text-destructive transition-colors text-left"
+             >
+               <Trash2 size={12} /> Delete
+             </button>
+          </div>
+        )}
 
         {/* Team mode: author attribution */}
         {isTeam && (
@@ -161,7 +211,23 @@ export const NoteTree = ({ onSelectNote, selectedId }: NoteTreeProps) => {
             >
               {sortBy === 'date' ? <Calendar size={12} /> : <ArrowDownAZ size={12} />}
             </button>
-            <button className="p-1 hover:text-primary hover:bg-accent rounded transition-colors">
+            <button 
+              onClick={() => {
+                const id = `n${Date.now()}`;
+                useNoteStore.getState().createNote({
+                  title: 'Untitled Note',
+                  content: '',
+                  tags: [],
+                  workspaceId: activeWorkspace?.id || 'ws1',
+                  userId: 'u1',
+                  backlinks: [],
+                  isPinned: false
+                });
+                onSelectNote(id);
+              }}
+              className="p-1 hover:text-primary hover:bg-accent rounded transition-colors"
+              title="New Note"
+            >
               <Plus size={12} />
             </button>
           </div>
@@ -250,6 +316,19 @@ export const NoteTree = ({ onSelectNote, selectedId }: NoteTreeProps) => {
         <Button
           variant="outline"
           size="sm"
+          onClick={() => {
+            const id = `n${Date.now()}`;
+            useNoteStore.getState().createNote({
+              title: 'Untitled Note',
+              content: '',
+              tags: [],
+              workspaceId: activeWorkspace?.id || 'ws1',
+              userId: 'u1',
+              backlinks: [],
+              isPinned: false
+            });
+            onSelectNote(id);
+          }}
           className="w-full justify-start gap-2 h-8 text-[11px] font-bold border-dashed hover:border-primary/50 hover:bg-primary/5 hover:text-primary"
         >
           <Plus size={13} /> New Page

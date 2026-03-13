@@ -132,7 +132,7 @@ export const AIPanel = ({ noteId }: { noteId: string }) => {
   ];
 
   return (
-    <div className="w-64 bg-card flex flex-col h-full overflow-hidden border-t border-border">
+    <div className="bg-card flex flex-col h-full overflow-hidden border-t border-border">
 
       {/* Header */}
       <div className="px-4 pt-3 pb-0 shrink-0">

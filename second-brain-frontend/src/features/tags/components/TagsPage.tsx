@@ -46,42 +46,44 @@ export const TagsPage = () => {
   };
 
   return (
-    <div className="h-full overflow-y-auto px-6 sm:px-10 pt-8 pb-12">
+    <div className="h-full overflow-y-auto px-4 sm:px-6 lg:px-10 pt-6 sm:pt-8 pb-12">
       <div className="max-w-5xl mx-auto">
 
         {/* Header */}
-        <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
           <div>
-            <span className="text-xs font-bold text-primary/70 uppercase tracking-widest">Knowledge Labels</span>
-            <h1 className="text-4xl font-extrabold tracking-tight text-foreground mt-1">Tags</h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Organize your notes into distinct categories.
+            <span className="text-[10px] sm:text-xs font-bold text-primary/70 uppercase tracking-widest">Knowledge Labels</span>
+            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground mt-1">Tags</h1>
+            <p className="text-muted-foreground mt-1 text-sm max-w-md">
+              Organize your notes into distinct categories for better discoverability.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 sm:flex-none">
               <Hash className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <input
                 type="text"
                 placeholder="Search tags..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="pl-9 pr-3 py-2 bg-background border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all w-44 focus:w-56 placeholder:text-muted-foreground/50"
+                className="pl-9 pr-3 py-2 bg-background border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all w-full sm:w-44 focus:sm:w-56 placeholder:text-muted-foreground/50"
               />
             </div>
-            <button
-              onClick={() => setSortBy(s => s === 'usage' ? 'alpha' : 'usage')}
-              title={`Sort by ${sortBy === 'usage' ? 'name' : 'usage count'}`}
-              className="h-10 w-10 flex items-center justify-center rounded-lg border border-border hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-            >
-              <ArrowUpDown size={16} />
-            </button>
-            <button
-              onClick={() => setIsNewLabelOpen(true)}
-              className="h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors flex items-center gap-2 premium-shadow"
-            >
-              <Plus size={16} /> New Tag
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setSortBy(s => s === 'usage' ? 'alpha' : 'usage')}
+                title={`Sort by ${sortBy === 'usage' ? 'name' : 'usage count'}`}
+                className="h-10 w-10 flex items-center justify-center rounded-lg border border-border hover:bg-accent transition-colors text-muted-foreground hover:text-foreground shrink-0"
+              >
+                <ArrowUpDown size={16} />
+              </button>
+              <button
+                onClick={() => setIsNewLabelOpen(true)}
+                className="h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors flex items-center gap-2 premium-shadow shrink-0 whitespace-nowrap"
+              >
+                <Plus size={16} /> <span className="hidden sm:inline">New Tag</span><span className="sm:hidden">New</span>
+              </button>
+            </div>
           </div>
         </header>
 
@@ -130,13 +132,13 @@ export const TagsPage = () => {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-4 shrink-0">
+                  <div className="flex items-center gap-3 sm:gap-4 shrink-0">
                     <button
                       onClick={() => navigate(`/editor?tag=${encodeURIComponent(tag.name)}`)}
-                      className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors font-medium"
+                      className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors font-medium"
                     >
-                      <FileText size={14} />
-                      {tag.usageCount} {tag.usageCount === 1 ? 'note' : 'notes'}
+                      <FileText size={14} className="shrink-0" />
+                      {tag.usageCount} <span className="hidden sm:inline">{tag.usageCount === 1 ? 'note' : 'notes'}</span>
                     </button>
 
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">

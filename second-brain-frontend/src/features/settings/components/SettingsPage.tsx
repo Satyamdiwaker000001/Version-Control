@@ -18,25 +18,25 @@ export const SettingsPage = () => {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto py-6 animate-in fade-in duration-500">
-      <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-zinc-900 dark:text-white tracking-tight">Settings</h1>
-        <p className="text-zinc-500 dark:text-zinc-400 mt-1 placeholder:text-sm">Manage your account settings and preferences.</p>
+    <div className="max-w-4xl mx-auto py-4 sm:py-6 px-4 sm:px-6 animate-in fade-in duration-500">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 dark:text-white tracking-tight">Settings</h1>
+        <p className="text-zinc-500 dark:text-zinc-400 mt-1 text-xs sm:text-sm">Manage your account settings and preferences.</p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-8">
         
         {/* Sidebar Navigation */}
         <div className="w-full md:w-64 shrink-0">
-          <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto pb-4 md:pb-0">
+          <nav className="flex flex-row md:flex-col gap-1 overflow-x-auto no-scrollbar pb-2 md:pb-0 -mx-4 px-4 md:mx-0 md:px-0 border-b md:border-b-0 border-zinc-200 dark:border-zinc-800">
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as SettingsTab)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap border-b-2 md:border-b-0 ${
                   activeTab === tab.id 
-                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white' 
-                    : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-white'
+                    ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white border-indigo-500' 
+                    : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:text-zinc-900 dark:hover:text-white border-transparent'
                 }`}
               >
                 <tab.icon size={18} className={activeTab === tab.id ? 'text-indigo-500' : 'text-zinc-400'} />
@@ -47,7 +47,7 @@ export const SettingsPage = () => {
         </div>
 
         {/* Tab Content Area */}
-        <div className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm min-h-[500px]">
+        <div className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 sm:p-6 shadow-sm min-h-[500px]">
           
           {activeTab === 'profile' && <ProfileSettings />}
           {activeTab === 'theme' && <ThemeSettings />}

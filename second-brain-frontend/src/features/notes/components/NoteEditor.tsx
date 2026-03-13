@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNoteStore, MOCK_TEAM_MEMBERS } from '@/features/notes/store/useNoteStore';
 import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
-import {
-  Save, GitCommit, MoreHorizontal, Share2, Clock,
-  Sparkles, Plus, Users, Lock, PanelRight, PanelRightClose,
-  Pin, Hash, ChevronRight,
+import { 
+  Save, GitCommit, MoreHorizontal, Share2, Clock, 
+  Sparkles, Plus, Users, Lock, PanelRight, 
+  PanelRightClose, Pin, Hash, ChevronRight,
+  Trash2, Edit3, MoveRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,11 +17,14 @@ interface NoteEditorProps {
   noteId: string | null;
   onTogglePanel: () => void;
   isPanelOpen: boolean;
+  onSelectNote?: (id: string) => void;
 }
 
-export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen }: NoteEditorProps) => {
+export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote }: NoteEditorProps) => {
   const note = useNoteStore(state => state.notes.find(n => n.id === noteId));
   const updateNote = useNoteStore(state => state.updateNote);
+  const deleteNote = useNoteStore(state => state.deleteNote);
+  const renameNote = useNoteStore(state => state.renameNote);
   const togglePin = useNoteStore(state => state.togglePin);
   const teamActivity = useNoteStore(state => state.teamActivity);
 
@@ -52,6 +56,14 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen }: NoteEditorPro
     }
   }, [content, title, note]);
 
+  // Handle title rename on blur
+  const handleTitleBlur = () => {
+    if (note && title !== note.title) {
+      renameNote(note.id, title);
+      toast.success('Note renamed');
+    }
+  };
+
   // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
@@ -63,14 +75,14 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen }: NoteEditorPro
   // No note selected — empty state
   if (!noteId || !note) {
     return (
-      <div className="flex-1 flex flex-col justify-center items-center text-muted-foreground h-full px-6">
-        <div className="w-20 h-20 rounded-3xl bg-accent flex items-center justify-center mb-6">
+      <div className="flex-1 flex flex-col justify-center items-center text-muted-foreground h-full px-4 sm:px-6">
+        <div className="w-16 sm:w-20 h-16 sm:h-20 rounded-2xl sm:rounded-3xl bg-accent flex items-center justify-center mb-6">
           <GitCommit size={32} className="text-primary opacity-30" />
         </div>
-        <h2 className="text-xl font-bold text-foreground mb-2 tracking-tight">
+        <h2 className="text-lg sm:text-xl font-bold text-foreground mb-2 tracking-tight text-center">
           {isTeam ? 'Select a shared page' : 'Select a note'}
         </h2>
-        <p className="text-sm text-center max-w-xs text-muted-foreground">
+        <p className="text-xs sm:text-sm text-center max-w-[240px] sm:max-w-xs text-muted-foreground">
           {isTeam
             ? 'Pick a shared page from the team tree on the left, or create a new one.'
             : 'Pick a note from the explorer on the left, or start a new one.'}
@@ -78,11 +90,24 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen }: NoteEditorPro
         <Button
           variant="outline"
           size="sm"
-          className="mt-6 gap-2"
+          className="mt-6 gap-2 premium-shadow"
+          onClick={() => {
+            const id = `n${Date.now()}`;
+            useNoteStore.getState().createNote({
+              title: 'Untitled Note',
+              content: '',
+              tags: [],
+              workspaceId: activeWorkspace?.id || 'ws1',
+              userId: 'u1',
+              backlinks: [],
+              isPinned: false
+            });
+            if (onSelectNote) onSelectNote(id);
+          }}
         >
           <Plus size={14} /> New Page
         </Button>
-        <p className="mt-3 text-xs text-muted-foreground/50">
+        <p className="mt-3 text-[10px] sm:text-xs text-muted-foreground/50">
           or press <kbd className="font-sans px-1.5 py-0.5 rounded border border-border bg-muted">⌘K</kbd> to search
         </p>
       </div>
@@ -116,6 +141,20 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen }: NoteEditorPro
     setIsDirty(false);
   };
 
+  const handleDelete = () => {
+    if (confirm('Are you sure you want to delete this note?')) {
+      deleteNote(note.id);
+      if (onSelectNote) onSelectNote('');
+      toast.success('Note deleted');
+    }
+  };
+
+  const handleShare = () => {
+    toast.info('Sharing options opened', {
+      description: 'You can now collaborate with your team.'
+    });
+  };
+
   return (
     <div className="flex-1 flex flex-col bg-background h-full overflow-hidden relative">
 
@@ -135,80 +174,118 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen }: NoteEditorPro
 
         {/* Actions */}
         <div className="flex items-center gap-1 shrink-0">
-          {/* Autosave indicator */}
-          <span
-            className={cn(
-              'items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full hidden sm:flex transition-all',
-              isDirty
-                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+          {/* Desktop Actions */}
+          <div className="hidden sm:flex items-center gap-1">
+            <span
+              className={cn(
+                'items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full transition-all flex mb-0',
+                isDirty
+                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                  : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+              )}
+            >
+              <Clock size={10} />
+              {isDirty ? 'UNSAVED' : 'SAVED'}
+            </span>
+
+            {isTeam && (
+              <div className="hidden md:flex -space-x-1.5 mx-2">
+                {MOCK_TEAM_MEMBERS.slice(0, 3).map(m => (
+                  <div
+                    key={m.id}
+                    title={`${m.name} — viewing`}
+                    className="w-7 h-7 rounded-full border-2 border-background text-[10px] font-bold text-white flex items-center justify-center cursor-default"
+                    style={{ backgroundColor: m.color }}
+                  >
+                    {m.initials[0]}
+                  </div>
+                ))}
+              </div>
             )}
-          >
-            <Clock size={10} />
-            {isDirty ? 'UNSAVED' : 'SAVED'}
-          </span>
 
-          {/* Team: who's viewing */}
-          {isTeam && (
-            <div className="hidden md:flex -space-x-1.5 mx-2">
-              {MOCK_TEAM_MEMBERS.slice(0, 3).map(m => (
-                <div
-                  key={m.id}
-                  title={`${m.name} — viewing`}
-                  className="w-7 h-7 rounded-full border-2 border-background text-[10px] font-bold text-white flex items-center justify-center cursor-default"
-                  style={{ backgroundColor: m.color }}
-                >
-                  {m.initials[0]}
-                </div>
-              ))}
-            </div>
-          )}
+            <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-9 gap-1.5 text-muted-foreground" 
+                title="Share this note"
+                onClick={handleShare}
+            >
+              <Share2 size={16} /> Share
+            </Button>
+            <Button
+              variant="ghost" size="sm"
+              className="h-9 w-9 text-muted-foreground"
+              onClick={() => togglePin(note.id)}
+              title={note.isPinned ? 'Unpin note' : 'Pin / Star note'}
+            >
+              <Pin size={16} className={cn(note.isPinned && 'fill-amber-500 text-amber-500')} />
+            </Button>
+            <Button
+              variant="ghost" size="sm"
+              className="h-9 w-9 text-primary opacity-70 hover:opacity-100"
+              title="Knowledge Engine — AI assistant"
+            >
+              <Sparkles size={16} />
+            </Button>
+            <div className="w-px h-4 bg-border mx-1" />
+            <Button
+              variant={isDirty ? 'default' : 'ghost'}
+              size="sm"
+              onClick={handleSave}
+              disabled={!isDirty}
+              className="h-9 gap-2"
+              title="Commit — save a new version"
+            >
+              <Save size={16} />
+              <span className="hidden sm:inline">Commit</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 w-9 text-muted-foreground"
+              onClick={onTogglePanel}
+              title={isPanelOpen ? 'Hide details panel' : 'Show details panel'}
+            >
+              {isPanelOpen ? <PanelRightClose size={16} /> : <PanelRight size={16} />}
+            </Button>
+          </div>
 
-          <Button variant="ghost" size="sm" className="h-9 gap-1.5 text-muted-foreground hidden sm:flex" title="Share this note">
-            <Share2 size={16} /> Share
-          </Button>
-          <Button
-            variant="ghost" size="sm"
-            className="h-9 w-9 text-muted-foreground"
-            onClick={() => togglePin(note.id)}
-            title={note.isPinned ? 'Unpin note' : 'Pin / Star note'}
-          >
-            <Pin size={16} className={cn(note.isPinned && 'fill-amber-500 text-amber-500')} />
-          </Button>
-          <Button
-            variant="ghost" size="sm"
-            className="h-9 w-9 text-primary opacity-70 hover:opacity-100"
-            title="Knowledge Engine — AI assistant"
-          >
-            <Sparkles size={16} />
-          </Button>
-          <div className="w-px h-4 bg-border mx-1" />
-          <Button
-            variant={isDirty ? 'default' : 'ghost'}
-            size="sm"
-            onClick={handleSave}
-            disabled={!isDirty}
-            className="h-9 gap-2"
-            title="Commit — save a new version"
-          >
-            <Save size={16} />
-            <span className="hidden sm:inline">Commit</span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-9 w-9 text-muted-foreground"
-            onClick={onTogglePanel}
-            title={isPanelOpen ? 'Hide details panel' : 'Show details panel'}
-          >
-            {isPanelOpen ? <PanelRightClose size={16} /> : <PanelRight size={16} />}
-          </Button>
+          {/* Mobile Actions Menu */}
+          <div className="flex sm:hidden items-center gap-1">
+             <Button
+                variant={isDirty ? 'default' : 'ghost'}
+                size="sm"
+                onClick={handleSave}
+                disabled={!isDirty}
+                className="h-8 w-8 p-0"
+              >
+                <Save size={16} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={onTogglePanel}
+              >
+                {isPanelOpen ? <PanelRightClose size={16} /> : <PanelRight size={16} />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 text-muted-foreground"
+                onClick={handleShare}
+              >
+                <MoreHorizontal size={18} />
+              </Button>
+          </div>
+
           <Button
             variant="ghost" size="icon"
-            className="h-9 w-9 text-muted-foreground"
-            title="More options"
+            className="h-9 w-9 text-muted-foreground hidden sm:flex"
+            onClick={handleDelete}
+            title="Delete this note"
           >
-            <MoreHorizontal size={16} />
+            <Trash2 size={16} />
           </Button>
         </div>
       </div>
@@ -231,6 +308,7 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen }: NoteEditorPro
           <textarea
             value={title}
             onChange={e => setTitle(e.target.value)}
+            onBlur={handleTitleBlur}
             rows={1}
             placeholder="Untitled"
             className="w-full text-4xl sm:text-5xl font-extrabold text-foreground bg-transparent border-none focus:ring-0 resize-none outline-none mb-3 placeholder:text-muted-foreground/20 leading-tight"
@@ -275,7 +353,7 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen }: NoteEditorPro
                 )}
 
                 {/* Active collaborators */}
-                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-accent cursor-pointer transition-colors">
+                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md hover:bg-accent cursor-pointer transition-colors" onClick={handleShare}>
                   <Users size={13} />
                   <span>{MOCK_TEAM_MEMBERS.length} collaborators</span>
                 </div>

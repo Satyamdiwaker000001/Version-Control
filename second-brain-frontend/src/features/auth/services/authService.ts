@@ -4,8 +4,8 @@ import apiClient, { type ApiResponse } from '@/shared/api/apiClient';
 export interface User {
   id: string;
   email: string;
-  name: string | null;
-  avatar: string | null;
+  name?: string;
+  avatar?: string;
   createdAt: string;
 }
 
@@ -72,7 +72,6 @@ export const authService = {
           id: `user_${Date.now()}`,
           email: input.email,
           name: input.name,
-          avatar: null,
           createdAt: new Date().toISOString(),
         };
         saveMockUsers([...users, { ...user, password: input.password }]);
@@ -106,12 +105,11 @@ export const authService = {
         const found = users.find(u => u.email === input.email && u.password === input.password);
         if (!found) {
           // Also check our seeded demo user
-          if (input.email === 'demo@example.com' && input.password === 'demo123') {
+          if (input.email === 'demo@example.com' && input.password === 'demo1234') {
             const demoUser: User = {
               id: 'demo_user',
               email: 'demo@example.com',
               name: 'Demo User',
-              avatar: null,
               createdAt: new Date().toISOString(),
             };
             const token = makeMockToken(demoUser);
@@ -121,7 +119,7 @@ export const authService = {
           }
           throw new Error('Invalid email or password');
         }
-        const { password: _, ...user } = found;
+        const { password, ...user } = found;
         const token = makeMockToken(user);
         localStorage.setItem('authToken', token);
         localStorage.setItem('user', JSON.stringify(user));

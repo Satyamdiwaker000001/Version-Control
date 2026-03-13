@@ -129,37 +129,39 @@ export const GraphPage = () => {
     <div className="flex flex-col h-full bg-background animate-in fade-in duration-700 relative overflow-hidden">
       
       {/* Premium Search & Control Interface */}
-      <div className="absolute top-6 left-6 right-6 z-20 flex items-start justify-between pointer-events-none">
-        <div className="flex flex-col gap-4 pointer-events-auto">
-          <div className="glass border border-border rounded-2xl p-4 shadow-2xl flex items-center gap-6">
+      <div className="absolute top-4 sm:top-6 left-4 sm:left-6 right-4 sm:right-6 z-20 flex flex-col sm:flex-row items-start justify-between gap-4 pointer-events-none">
+        <div className="flex flex-col gap-3 sm:gap-4 pointer-events-auto w-full sm:w-auto">
+          <div className="glass border border-border rounded-2xl p-3 sm:p-4 shadow-2xl flex items-center justify-between sm:justify-start gap-3 sm:gap-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                <Network size={22} />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                <Network size={18} className="sm:hidden" />
+                <Network size={22} className="hidden sm:block" />
               </div>
-              <div className="flex flex-col">
-                <h1 className="text-sm font-extrabold tracking-tight text-foreground uppercase">Neural Graph</h1>
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{activeWorkspace?.name || 'Local'}</span>
+              <div className="flex flex-col min-w-0">
+                <h1 className="text-[11px] sm:text-sm font-extrabold tracking-tight text-foreground uppercase truncate">Neural Graph</h1>
+                <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase tracking-widest truncate">{activeWorkspace?.name || 'Local'}</span>
               </div>
             </div>
-            <div className="h-8 w-px bg-border"></div>
-            <div className="flex items-center gap-2">
-               <Button variant="ghost" size="sm" className="h-9 gap-2 text-xs font-bold text-muted-foreground hover:text-foreground group">
-                  <Filter size={14} /> <span>{activeTag || 'ALL NODES'}</span>
+            <div className="h-6 sm:h-8 w-px bg-border"></div>
+            <div className="flex items-center gap-1 sm:gap-2">
+               <Button variant="ghost" size="sm" className="h-8 sm:h-9 gap-2 text-[10px] sm:text-xs font-bold text-muted-foreground hover:text-foreground group px-2 sm:px-3">
+                  <Filter size={13} className="shrink-0" /> <span className="truncate max-w-[60px] sm:max-w-none">{activeTag || 'ALL'}</span>
                </Button>
-               <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground group">
-                  <MousePointer2 size={16} />
+               <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9 text-muted-foreground group">
+                  <MousePointer2 size={14} className="sm:hidden" />
+                  <MousePointer2 size={16} className="hidden sm:block" />
                </Button>
             </div>
           </div>
           
           {/* Active Tag Pills */}
-          <div className="flex flex-wrap gap-2 max-w-sm">
-             {tags.slice(0, 5).map(tag => (
+          <div className="flex flex-wrap gap-1.5 sm:gap-2 max-w-full sm:max-w-sm">
+             {tags.slice(0, 4).map(tag => (
                 <button 
                   key={tag.id}
                   onClick={() => setActiveTag(activeTag === tag.name ? null : tag.name)}
                   className={cn(
-                    "px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-all",
+                    "px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-wider border transition-all shrink-0",
                     activeTag === tag.name 
                       ? "bg-primary text-primary-foreground border-primary" 
                       : "bg-accent/50 text-muted-foreground border-border hover:border-primary/50"
@@ -171,15 +173,16 @@ export const GraphPage = () => {
           </div>
         </div>
 
-        <div className="glass border border-border rounded-2xl p-1.5 shadow-2xl pointer-events-auto flex flex-col gap-1">
-          <Button variant="ghost" size="icon" onClick={() => fgRef.current?.zoom(fgRef.current.zoom() * 1.5, 400)} className="h-10 w-10 text-muted-foreground">
+        <div className="glass border border-border rounded-xl sm:rounded-2xl p-1 sm:p-1.5 shadow-2xl pointer-events-auto flex flex-row sm:flex-col gap-1 sm:gap-1 absolute bottom-[-180px] right-0 sm:static">
+          <Button variant="ghost" size="icon" onClick={() => fgRef.current?.zoom(fgRef.current.zoom() * 1.5, 400)} className="h-9 w-9 sm:h-10 sm:w-10 text-muted-foreground">
             <ZoomIn size={18} />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => fgRef.current?.zoom(fgRef.current.zoom() / 1.5, 400)} className="h-10 w-10 text-muted-foreground">
+          <Button variant="ghost" size="icon" onClick={() => fgRef.current?.zoom(fgRef.current.zoom() / 1.5, 400)} className="h-9 w-9 sm:h-10 sm:w-10 text-muted-foreground">
             <ZoomOut size={18} />
           </Button>
-          <div className="h-px w-6 bg-border mx-auto my-1"></div>
-          <Button variant="ghost" size="icon" onClick={() => fgRef.current?.centerAt(0, 0, 400)} className="h-10 w-10 text-muted-foreground">
+          <div className="hidden sm:block h-px w-6 bg-border mx-auto my-1"></div>
+          <div className="sm:hidden w-px h-6 bg-border my-auto mx-1"></div>
+          <Button variant="ghost" size="icon" onClick={() => fgRef.current?.centerAt(0, 0, 400)} className="h-9 w-9 sm:h-10 sm:w-10 text-muted-foreground">
             <Focus size={18} />
           </Button>
         </div>
@@ -255,10 +258,10 @@ export const GraphPage = () => {
       </div>
 
       {/* Legend / Stats Footer */}
-      <div className="absolute bottom-6 left-6 z-20 glass border border-border rounded-xl px-4 py-2 shadow-xl flex items-center gap-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-         <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_rgba(139,92,246,0.5)]"></div> PINNED</div>
-         <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-border"></div> STANDARD</div>
-         <div className="flex items-center gap-1.5 text-foreground/80"><Network size={12} /> {graphData.nodes.length} NODES</div>
+      <div className="absolute bottom-4 sm:bottom-6 left-4 sm:left-6 z-20 glass border border-border rounded-xl px-3 sm:px-4 py-1.5 sm:py-2 shadow-xl flex items-center gap-3 sm:gap-4 text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+         <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-primary shadow-[0_0_8px_rgba(139,92,246,0.5)]"></div> PINNED</div>
+         <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-border"></div> STANDARD</div>
+         <div className="flex items-center gap-1.5 text-foreground/80"><Network size={12} /> {graphData.nodes.length} <span className="hidden sm:inline">NODES</span></div>
       </div>
 
     </div>

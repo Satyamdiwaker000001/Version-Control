@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { User } from '@/shared/types';
 import { authService } from '../services/authService';
 
-interface AuthState {
+export interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;

@@ -19,6 +19,8 @@ export interface NoteState {
 
   createNote: (note: Omit<Note, 'id' | 'createdAt' | 'updatedAt' | 'versionCount' | 'latestVersionId'>) => void;
   updateNote: (id: string, content: string, commitMessage: string, authorId: string) => void;
+  deleteNote: (id: string) => void;
+  renameNote: (id: string, title: string) => void;
   getNoteVersions: (noteId: string) => NodeVersion[];
   fetchNoteHistory: (workspaceId: string, slug: string, token: string) => Promise<void>;
   togglePin: (id: string) => void;
@@ -137,6 +139,14 @@ export const useNoteStore = create<NoteState>((set, get) => ({
         ? { ...n, content, updatedAt: new Date().toISOString(), versionCount: n.versionCount + 1 }
         : n
     ),
+  })),
+
+  deleteNote: (id) => set((state) => ({
+    notes: state.notes.filter(n => n.id !== id)
+  })),
+
+  renameNote: (id, title) => set((state) => ({
+    notes: state.notes.map(n => n.id === id ? { ...n, title, updatedAt: new Date().toISOString() } : n)
   })),
 
   getNoteVersions: (noteId) => get().versions.filter(v => v.noteId === noteId),
