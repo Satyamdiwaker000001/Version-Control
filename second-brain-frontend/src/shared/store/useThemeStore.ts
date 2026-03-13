@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type ThemeMode = 'light' | 'dark' | 'system';
+export type ThemeMode = 'light' | 'dark' | 'system' | 'midnight' | 'forest' | 'quartz' | 'emerald' | 'nord' | 'sunset' | 'coffee' | 'crimson' | 'steel';
 
 export interface ThemeState {
   themeMode: ThemeMode;
@@ -12,19 +12,31 @@ export interface ThemeState {
 const getSystemDark = () =>
   typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-function applyTheme(isDark: boolean) {
-  if (isDark) {
-    document.documentElement.classList.add('dark');
-    document.documentElement.classList.remove('light');
+const THEME_CLASSES: ThemeMode[] = ['light', 'dark', 'midnight', 'forest', 'quartz', 'emerald', 'nord', 'sunset', 'coffee', 'crimson', 'steel'];
+
+function applyTheme(mode: ThemeMode) {
+  const root = document.documentElement;
+  
+  // Remove all theme classes
+  THEME_CLASSES.forEach(cls => root.classList.remove(cls));
+
+  if (mode === 'system') {
+    const isDark = getSystemDark();
+    root.classList.add(isDark ? 'dark' : 'light');
   } else {
-    document.documentElement.classList.remove('dark');
-    document.documentElement.classList.add('light');
+    root.classList.add(mode);
   }
 }
 
 const storedMode = (localStorage.getItem('theme') as ThemeMode) || 'dark';
-const initialDark = storedMode === 'system' ? getSystemDark() : storedMode === 'dark';
-applyTheme(initialDark);
+
+const getIsDark = (mode: ThemeMode) => {
+  if (mode === 'system') return getSystemDark();
+  return ['dark', 'midnight', 'forest', 'nord', 'sunset', 'crimson'].includes(mode);
+};
+
+const initialDark = getIsDark(storedMode);
+applyTheme(storedMode);
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
   themeMode: storedMode,
@@ -32,20 +44,20 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
 
   setTheme: (mode) => {
     localStorage.setItem('theme', mode);
-    const isDark = mode === 'system' ? getSystemDark() : mode === 'dark';
-    applyTheme(isDark);
+    const isDark = getIsDark(mode);
+    applyTheme(mode);
     set({ themeMode: mode, isDarkMode: isDark });
   },
 
   initializeTheme: () => {
     const mode = get().themeMode;
-    const isDark = mode === 'system' ? getSystemDark() : mode === 'dark';
-    applyTheme(isDark);
+    const isDark = getIsDark(mode);
+    applyTheme(mode);
     set({ isDarkMode: isDark });
 
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
       if (get().themeMode === 'system') {
-        applyTheme(e.matches);
+        applyTheme('system');
         set({ isDarkMode: e.matches });
       }
     });
