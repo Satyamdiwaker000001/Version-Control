@@ -2,17 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import { Sun, Moon, Bell, Search, X, Settings, LogOut, User, ChevronRight, Menu } from 'lucide-react';
 import { useThemeStore } from '@/shared/store/useThemeStore';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
+import { useNotificationStore } from '@/features/notifications/store/useNotificationStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/shared/utils/cn';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
-
-const MOCK_NOTIFICATIONS = [
-  { id: '1', type: 'comment', text: 'Alex Johnson commented on "Q1 Research Roadmap"', time: new Date(Date.now() - 3600000 * 1), read: false  },
-  { id: '2', type: 'mention', text: 'Sarah Chen mentioned you in "Dataset Curation Guide"', time: new Date(Date.now() - 3600000 * 3), read: false },
-  { id: '3', type: 'version', text: '"Evaluation Framework" was updated with a new commit', time: new Date(Date.now() - 86400000 * 1), read: true  },
-  { id: '4', type: 'version', text: '"Q1 Research Roadmap" pinned by Alex Johnson', time: new Date(Date.now() - 86400000 * 2), read: true },
-];
 
 export const Header = ({ 
   onOpenCommand, 
@@ -23,15 +17,20 @@ export const Header = ({
 }) => {
   const { isDarkMode, setTheme } = useThemeStore();
   const { user, logout } = useAuthStore();
+  const { 
+    notifications, unreadCount, fetchNotifications, 
+    markAsRead, markAllAsRead 
+  } = useNotificationStore();
   const navigate = useNavigate();
 
   const [notifOpen, setNotifOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -42,8 +41,6 @@ export const Header = ({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
-
-  const markAllRead = () => setNotifications(n => n.map(x => ({ ...x, read: true })));
 
   const mockPresence = [
     { id: 'u2', initial: 'A', color: '#3b82f6' },
@@ -155,7 +152,7 @@ export const Header = ({
                   <h3 className="font-bold text-sm text-foreground">Notifications</h3>
                   <div className="flex items-center gap-2">
                     {unreadCount > 0 && (
-                      <button onClick={markAllRead} className="text-[11px] text-primary font-semibold hover:underline">
+                      <button onClick={markAllAsRead} className="text-[11px] text-primary font-semibold hover:underline">
                         Mark all read
                       </button>
                     )}
@@ -168,7 +165,7 @@ export const Header = ({
                   {notifications.map(notif => (
                     <div
                       key={notif.id}
-                      onClick={() => setNotifications(n => n.map(x => x.id === notif.id ? { ...x, read: true } : x))}
+                      onClick={() => markAsRead(notif.id)}
                       className={cn(
                         'px-4 py-3 cursor-pointer hover:bg-accent/50 transition-colors',
                         !notif.read && 'bg-primary/5'
@@ -179,12 +176,17 @@ export const Header = ({
                         <div className={cn('flex-1', notif.read && 'pl-3.5')}>
                           <p className="text-[12px] text-foreground leading-relaxed">{notif.text}</p>
                           <p className="text-[10px] text-muted-foreground mt-1 font-medium">
-                            {formatDistanceToNow(notif.time, { addSuffix: true })}
+                            {formatDistanceToNow(new Date(notif.time), { addSuffix: true })}
                           </p>
                         </div>
                       </div>
                     </div>
                   ))}
+                  {notifications.length === 0 && (
+                    <div className="p-8 text-center text-muted-foreground text-sm">
+                      No notifications yet.
+                    </div>
+                  )}
                 </div>
                 <div className="px-4 py-2.5 border-t border-border">
                   <button className="text-xs text-primary font-semibold hover:underline w-full text-center">
