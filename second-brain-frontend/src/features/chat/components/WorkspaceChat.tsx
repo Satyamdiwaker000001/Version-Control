@@ -7,12 +7,21 @@ import { Button } from '@/shared/ui/Button';
 import { cn } from '@/shared/utils/cn';
 
 export const WorkspaceChat = () => {
-  const { messages, channels, activeChannelId, setActiveChannel, isChatOpen, setChatOpen, sendMessage } = useChatStore();
+  const { messages, channels, activeChannelId, setActiveChannel, isChatOpen, setChatOpen, sendMessage, createChannel } = useChatStore();
   const activeWorkspace = useWorkspaceStore(state => state.activeWorkspace);
   
   const [inputText, setInputText] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const handleCreateChannel = () => {
+    if (!activeWorkspace) return;
+    const name = prompt('Enter channel name:');
+    if (name) {
+      createChannel(activeWorkspace.id, name.toLowerCase().replace(/\s+/g, '-'));
+      toast.success(`Channel #${name} created`);
+    }
+  };
 
   const workspaceChannels = useMemo(() => 
     channels.filter(c => c.workspaceId === activeWorkspace?.id),
@@ -103,7 +112,11 @@ export const WorkspaceChat = () => {
                 <div>
                   <div className="px-4 mb-2 flex items-center justify-between group">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Channels</span>
-                    <Plus size={14} className="hover:text-white cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <Plus 
+                      size={14} 
+                      onClick={handleCreateChannel}
+                      className="hover:text-white cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" 
+                    />
                   </div>
                   <div className="space-y-0.5">
                     {workspaceChannels.map(channel => (

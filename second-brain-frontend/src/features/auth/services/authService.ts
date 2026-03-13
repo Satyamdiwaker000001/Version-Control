@@ -61,7 +61,8 @@ export const authService = {
         return response.data.data;
       }
       throw new Error(response.data.message || 'Registration failed');
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as any;
       // If network error — fall back to mock
       if (!err.response) {
         const users = getMockUsers();
@@ -98,7 +99,8 @@ export const authService = {
         return response.data.data;
       }
       throw new Error(response.data.message || 'Login failed');
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as any;
       // If network error — fall back to mock
       if (!err.response) {
         const users = getMockUsers();
@@ -138,7 +140,8 @@ export const authService = {
         return response.data.data;
       }
       throw new Error('Failed to fetch user');
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as any;
       if (!err.response) {
         const stored = this.getStoredUser();
         if (stored) return stored as User;
@@ -157,7 +160,8 @@ export const authService = {
         return response.data.data;
       }
       throw new Error('Failed to update profile');
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = error as any;
       if (!err.response) {
         const user = this.getStoredUser();
         if (!user) throw new Error('Not authenticated');

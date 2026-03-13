@@ -13,18 +13,18 @@ export const GithubConnectPage = () => {
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (isConnected) {
-      loadRepositories();
-    }
-  }, [isConnected]);
-
   const loadRepositories = async () => {
     setIsLoadingRepos(true);
     const repos = await githubService.getRepositories();
     setRepositories(repos);
     setIsLoadingRepos(false);
   };
+
+  useEffect(() => {
+    if (isConnected) {
+      loadRepositories();
+    }
+  }, [isConnected]);
 
   const handleConnect = async () => {
     setIsConnecting(true);

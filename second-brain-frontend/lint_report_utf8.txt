@@ -1,0 +1,232 @@
+﻿
+> second-brain-frontend@0.0.0 lint
+> eslint .
+
+
+A:\New project\Version-Control\second-brain-frontend\src\features\ai\components\AIPanel.tsx
+  83:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+A:\New project\Version-Control\second-brain-frontend\src\features\ai\components\AIPanel.tsx:83:5
+  81 |   // Reset state when note changes
+  82 |   useEffect(() => {
+> 83 |     setSummary(null);
+     |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  84 |     setToneResult(null);
+  85 |     setMessages([]);
+  86 |     setInput('');  react-hooks/set-state-in-effect
+
+A:\New project\Version-Control\second-brain-frontend\src\features\analytics\components\DashboardPage.tsx
+   54:74  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-explicit-any
+  259:39  error  Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+A:\New project\Version-Control\second-brain-frontend\src\features\analytics\components\DashboardPage.tsx:259:39
+  257 |                 <div className="grid grid-cols-7 gap-1">
+  258 |                   {Array.from({ length: 28 }).map((_, i) => {
+> 259 |                     const intensity = Math.random();
+      |                                       ^^^^^^^^^^^^^ Cannot call impure function
+  260 |                     return (
+  261 |                       <div
+  262 |                         key={i}  react-hooks/purity
+  286:74  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       @typescript-eslint/no-explicit-any
+
+A:\New project\Version-Control\second-brain-frontend\src\features\auth\services\authService.ts
+   64:19  error  Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+  101:19  error  Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+  122:17  error  'password' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  141:19  error  Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+  160:19  error  Unexpected any. Specify a different type       @typescript-eslint/no-explicit-any
+
+A:\New project\Version-Control\second-brain-frontend\src\features\auth\store\useAuthStore.ts
+   53:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   72:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   91:14  error  'error' is defined but never used         @typescript-eslint/no-unused-vars
+  102:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+A:\New project\Version-Control\second-brain-frontend\src\features\chat\components\WorkspaceChat.tsx
+  258:47  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+A:\New project\Version-Control\second-brain-frontend\src\features\github\components\GithubConnectPage.tsx
+  18:7  error  Error: Cannot access variable before it is declared
+
+`loadRepositories` is accessed before it is declared, which prevents the earlier access from updating when this value changes over time.
+
+A:\New project\Version-Control\second-brain-frontend\src\features\github\components\GithubConnectPage.tsx:18:7
+  16 |   useEffect(() => {
+  17 |     if (isConnected) {
+> 18 |       loadRepositories();
+     |       ^^^^^^^^^^^^^^^^ `loadRepositories` accessed before it is declared
+  19 |     }
+  20 |   }, [isConnected]);
+  21 |
+
+A:\New project\Version-Control\second-brain-frontend\src\features\github\components\GithubConnectPage.tsx:22:3
+  20 |   }, [isConnected]);
+  21 |
+> 22 |   const loadRepositories = async () => {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 23 |     setIsLoadingRepos(true);
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 24 |     const repos = await githubService.getRepositories();
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 25 |     setRepositories(repos);
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 26 |     setIsLoadingRepos(false);
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 27 |   };
+     | ^^^^^ `loadRepositories` is declared here
+  28 |
+  29 |   const handleConnect = async () => {
+  30 |     setIsConnecting(true);  react-hooks/immutability
+
+A:\New project\Version-Control\second-brain-frontend\src\features\github\services\githubService.ts
+  93:26  error  '_repoId' is defined but never used  @typescript-eslint/no-unused-vars
+
+A:\New project\Version-Control\second-brain-frontend\src\features\graph\components\GraphPage.tsx
+   37:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   74:54  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   84:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  105:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  202:31  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  203:31  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  205:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  209:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+A:\New project\Version-Control\second-brain-frontend\src\features\notes\components\NoteEditor.tsx
+    6:19  error    'Users' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+   43:7   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+A:\New project\Version-Control\second-brain-frontend\src\features\notes\components\NoteEditor.tsx:43:7
+  41 |   useEffect(() => {
+  42 |     if (note) {
+> 43 |       setContent(note.content);
+     |       ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  44 |       setTitle(note.title);
+  45 |       setIsDirty(false);
+  46 |     } else {        react-hooks/set-state-in-effect
+   51:6   warning  React Hook useEffect has a missing dependency: 'note'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     react-hooks/exhaustive-deps
+   55:7   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+A:\New project\Version-Control\second-brain-frontend\src\features\notes\components\NoteEditor.tsx:55:7
+  53 |   useEffect(() => {
+  54 |     if (note) {
+> 55 |       setIsDirty(content !== note.content || title !== note.title);
+     |       ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  56 |     }
+  57 |   }, [content, title, note]);
+  58 |  react-hooks/set-state-in-effect
+  134:19  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-explicit-any
+  152:14  error    'err' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+
+A:\New project\Version-Control\second-brain-frontend\src\features\notes\components\NoteTree.tsx
+    7:13  error  'ChevronDown' is defined but never used               @typescript-eslint/no-unused-vars
+    7:26  error  'ChevronRight' is defined but never used              @typescript-eslint/no-unused-vars
+    8:3   error  'Hash' is defined but never used                      @typescript-eslint/no-unused-vars
+    8:32  error  'Star' is defined but never used                      @typescript-eslint/no-unused-vars
+   12:10  error  'Button' is defined but never used                    @typescript-eslint/no-unused-vars
+   33:13  error  Unexpected any. Specify a different type              @typescript-eslint/no-explicit-any
+   34:11  error  Unexpected any. Specify a different type              @typescript-eslint/no-explicit-any
+  122:10  error  'isTagsOpen' is assigned a value but never used       @typescript-eslint/no-unused-vars
+  122:22  error  'setIsTagsOpen' is assigned a value but never used    @typescript-eslint/no-unused-vars
+  132:9   error  'handleTagToggle' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+A:\New project\Version-Control\second-brain-frontend\src\features\notes\services\noteService.ts
+  19:10  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+A:\New project\Version-Control\second-brain-frontend\src\features\notes\store\useNoteStore.ts
+  136:29  error  '_commitMessage' is defined but never used  @typescript-eslint/no-unused-vars
+  136:45  error  '_authorId' is defined but never used       @typescript-eslint/no-unused-vars
+  160:67  error  Unexpected any. Specify a different type    @typescript-eslint/no-explicit-any
+
+A:\New project\Version-Control\second-brain-frontend\src\features\projects\components\ProjectPage.tsx
+  106:68  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+A:\New project\Version-Control\second-brain-frontend\src\features\settings\components\SettingsPage.tsx
+   20:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  161:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  172:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+A:\New project\Version-Control\second-brain-frontend\src\features\tags\components\TagsPage.tsx
+  44:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  54:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+A:\New project\Version-Control\second-brain-frontend\src\features\workspace\services\workspaceService.ts
+  22:10  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+A:\New project\Version-Control\second-brain-frontend\src\features\workspace\store\useWorkspaceStore.ts
+   42:56  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  141:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  151:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+A:\New project\Version-Control\second-brain-frontend\src\shared\api\apiClient.ts
+   5:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  10:13  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  57:35  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  60:10  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  62:3   error  Unnecessary try/catch wrapper             no-useless-catch
+  68:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+A:\New project\Version-Control\second-brain-frontend\src\shared\layout\AppLayout.tsx
+  16:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+A:\New project\Version-Control\second-brain-frontend\src\shared\layout\AppLayout.tsx:16:5
+  14 |   // Close mobile sidebar on route change
+  15 |   useEffect(() => {
+> 16 |     setIsMobileSidebarOpen(false);
+     |     ^^^^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  17 |   }, [location.pathname]);
+  18 |
+  19 |   // Cmd/Ctrl+K to open command palette  react-hooks/set-state-in-effect
+
+A:\New project\Version-Control\second-brain-frontend\src\shared\layout\GlobalSearch.tsx
+   7:42  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-explicit-any
+  13:7   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+A:\New project\Version-Control\second-brain-frontend\src\shared\layout\GlobalSearch.tsx:13:7
+  11 |   useEffect(() => {
+  12 |     if (query.trim().length < 2) {
+> 13 |       setResults([]);
+     |       ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  14 |       return;
+  15 |     }
+  16 |  react-hooks/set-state-in-effect
+
+A:\New project\Version-Control\second-brain-frontend\src\shared\layout\Sidebar.tsx
+  66:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+A:\New project\Version-Control\second-brain-frontend\src\shared\ui\Input.tsx
+  4:18  error  An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+
+Γ£û 65 problems (64 errors, 1 warning)
+

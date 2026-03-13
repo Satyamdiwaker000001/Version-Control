@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const TAG_COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#84cc16'];
 
 export const TagsPage = () => {
-  const { tags, loadTags, isLoading } = useTagStore();
+  const { tags, loadTags, isLoading, createTag, deleteTag } = useTagStore();
   const notes = useNoteStore(state => state.notes);
   const navigate = useNavigate();
 
@@ -26,23 +26,37 @@ export const TagsPage = () => {
   const tagMetrics = useMemo(() => {
     return tags
       .map(tag => {
-        const relatedNotes = notes.filter(n => n.tags.includes(tag.name));
-        return { ...tag, usageCount: relatedNotes.length };
+        // Find notes that contain this tag name in their tags array
+        const relatedNotesCount = notes.reduce((count, n) => {
+          return count + (n.tags.some(tn => tn.toLowerCase() === tag.name.toLowerCase()) ? 1 : 0);
+        }, 0);
+        return { ...tag, usageCount: relatedNotesCount };
       })
       .filter(t => t.name.toLowerCase().includes(search.toLowerCase()))
       .sort((a, b) => sortBy === 'alpha' ? a.name.localeCompare(b.name) : b.usageCount - a.usageCount);
   }, [tags, notes, search, sortBy]);
 
-  const handleCreateLabel = () => {
+  const handleCreateLabel = async () => {
     if (!newLabelName.trim()) { toast.error('Label name cannot be empty'); return; }
-    toast.success(`Label "${newLabelName}" created`);
-    setNewLabelName('');
-    setNewLabelColor(TAG_COLORS[0]);
-    setIsNewLabelOpen(false);
+    try {
+      await createTag(newLabelName, newLabelColor);
+      toast.success(`Tag "${newLabelName}" created`);
+      setNewLabelName('');
+      setNewLabelColor(TAG_COLORS[0]);
+      setIsNewLabelOpen(false);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create tag');
+    }
   };
 
-  const handleDelete = (name: string) => {
-    toast.success(`Label "${name}" deleted`);
+  const handleDelete = async (tag: { id: string, name: string }) => {
+    if (!confirm(`Are you sure you want to delete tag "${tag.name}"?`)) return;
+    try {
+      await deleteTag(tag.id);
+      toast.success(`Tag "${tag.name}" deleted`);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete tag');
+    }
   };
 
   return (
@@ -150,7 +164,7 @@ export const TagsPage = () => {
                         <Pencil size={14} />
                       </button>
                       <button
-                        onClick={() => handleDelete(tag.name)}
+                        onClick={() => handleDelete(tag)}
                         className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
                         title="Delete tag"
                       >

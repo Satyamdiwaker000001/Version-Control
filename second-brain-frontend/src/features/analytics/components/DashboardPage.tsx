@@ -255,9 +255,9 @@ const SoloDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) 
                   <p className="text-sm text-muted-foreground font-medium">day streak 🔥</p>
                 </div>
                 <div className="grid grid-cols-7 gap-1">
-                  {Array.from({ length: 28 }).map((_, i) => {
-                    const intensity = Math.random();
-                    return (
+                  {useMemo(() => {
+                    const intensities = Array.from({ length: 28 }, () => Math.random());
+                    return intensities.map((intensity, i) => (
                       <div
                         key={i}
                         className="aspect-square rounded-sm"
@@ -267,8 +267,8 @@ const SoloDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) 
                             : 'hsl(var(--muted))',
                         }}
                       />
-                    );
-                  })}
+                    ));
+                  }, [])}
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-2 text-center">Last 28 days</p>
               </CardContent>

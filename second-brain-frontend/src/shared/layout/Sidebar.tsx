@@ -41,7 +41,7 @@ const NAV_SECTIONS = [
   {
     label: 'System',
     items: [
-      { name: 'Settings', path: '/settings', icon: Settings },
+      { name: 'Settings', path: '/settings/appearance', icon: Settings },
     ],
   },
 ];
@@ -49,21 +49,26 @@ const NAV_SECTIONS = [
 export const Sidebar = () => {
   const location = useLocation();
   const logout = useAuthStore((state) => state.logout);
-  const { workspaces, activeWorkspace, selectWorkspace } = useWorkspaceStore();
+  const { workspaces, activeWorkspace, selectWorkspace, createWorkspace, isLoading } = useWorkspaceStore();
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newWsName, setNewWsName] = useState('');
   const [newWsType, setNewWsType] = useState<'solo' | 'team'>('solo');
 
-  const handleCreateWorkspace = () => {
+  const handleCreateWorkspace = async () => {
     if (!newWsName.trim()) { toast.error('Workspace name is required'); return; }
-    toast.success(`Workspace "${newWsName}" created!`);
-    setNewWsName('');
-    setNewWsType('solo');
-    setIsCreateOpen(false);
+    try {
+      await createWorkspace({ name: newWsName, type: newWsType });
+      toast.success(`Workspace "${newWsName}" created!`);
+      setNewWsName('');
+      setNewWsType('solo');
+      setIsCreateOpen(false);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create workspace');
+    }
   };
 
-  const NavLink = ({ item }: { item: { name: string; path: string; icon: any } }) => {
+  const NavLink = ({ item }: { item: { name: string; path: string; icon: React.ElementType } }) => {
     const Icon = item.icon;
     const isActive = location.pathname === item.path || 
       (item.path !== '/' && location.pathname.startsWith(item.path));
@@ -264,9 +269,10 @@ export const Sidebar = () => {
                 </button>
                 <button
                   onClick={handleCreateWorkspace}
-                  className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+                  disabled={isLoading}
+                  className="flex-1 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Create
+                  {isLoading ? 'Creating...' : 'Create'}
                 </button>
               </div>
             </div>
