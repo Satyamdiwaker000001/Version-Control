@@ -205,8 +205,12 @@ export const Header = ({
             className="flex items-center gap-2 cursor-pointer hover:bg-accent rounded-lg px-2 py-1.5 transition-colors"
             title="Account menu"
           >
-            <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-xs border border-primary/30">
-              {user?.email?.charAt(0).toUpperCase() || 'U'}
+            <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden text-primary font-semibold text-xs border border-primary/30">
+              {user?.avatar ? (
+                <img src={user.avatar} alt="User Avatar" className="w-full h-full object-cover" />
+              ) : (
+                user?.email?.charAt(0).toUpperCase() || 'U'
+              )}
             </div>
             <span className="text-sm font-medium text-foreground hidden md:block">
               {user?.name || user?.email?.split('@')[0] || 'User'}
