@@ -9,6 +9,7 @@ import WorkspaceChat from '@/features/chat/components/WorkspaceChat';
 export const AppLayout = () => {
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const location = useLocation();
 
   // Close mobile sidebar on route change
@@ -30,47 +31,56 @@ export const AppLayout = () => {
   }, []);
 
   return (
-    <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans transition-colors selection:bg-primary/30">
+    <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden font-sans transition-colors selection:bg-primary/30">
       
-      {/* ── Desktop sidebar (always visible ≥lg) ── */}
-      <div className="hidden lg:flex shrink-0">
-        <Sidebar />
-      </div>
+      {/* ── Top Bar (Full Width) ── */}
+      <Header
+        onOpenCommand={() => setIsCommandOpen(true)}
+        onToggleMobileSidebar={() => setIsMobileSidebarOpen(v => !v)}
+      />
 
-      {/* ── Mobile drawer overlay ── */}
-      <AnimatePresence>
-        {isMobileSidebarOpen && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden"
-              onClick={() => setIsMobileSidebarOpen(false)}
-            />
-            {/* Drawer */}
-            <motion.div
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="fixed left-0 top-0 bottom-0 z-50 lg:hidden"
-            >
-              <Sidebar />
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+      <div className="flex-1 flex overflow-hidden relative">
+        <motion.div 
+          initial={false}
+          animate={{ width: isSidebarCollapsed ? 80 : 256 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+          className="hidden lg:flex shrink-0 border-r border-border overflow-hidden bg-card"
+        >
+          <Sidebar 
+            isCollapsed={isSidebarCollapsed} 
+            onToggle={() => setIsSidebarCollapsed(v => !v)} 
+          />
+        </motion.div>
 
-      {/* ── Main content area ── */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header
-          onOpenCommand={() => setIsCommandOpen(true)}
-          onToggleMobileSidebar={() => setIsMobileSidebarOpen(v => !v)}
-        />
-        <main className="flex-1 overflow-y-auto w-full p-3 sm:p-5 lg:p-8 2xl:p-10 relative">
+        {/* ── Mobile drawer overlay ── */}
+        <AnimatePresence>
+          {isMobileSidebarOpen && (
+            <>
+              {/* Backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="fixed inset-0 top-16 z-30 bg-background/80 backdrop-blur-sm lg:hidden"
+                onClick={() => setIsMobileSidebarOpen(false)}
+              />
+              {/* Drawer */}
+              <motion.div
+                initial={{ x: '-100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '-100%' }}
+                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+                className="fixed left-0 top-16 bottom-0 z-40 lg:hidden"
+              >
+                <Sidebar />
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+
+        {/* ── Main content area ── */}
+        <main className="flex-1 overflow-y-auto w-full p-3 sm:p-5 lg:p-8 2xl:p-10 relative transition-all duration-300 ease-in-out">
           <div className="max-w-screen-2xl mx-auto h-full">
             <AnimatePresence mode="wait">
               <motion.div

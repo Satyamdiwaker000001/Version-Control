@@ -80,6 +80,7 @@ export const TagsPage = () => {
                 placeholder="Search tags..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
+                title="Search existing tags"
                 className="pl-9 pr-3 py-2 bg-background border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all w-full sm:w-44 focus:sm:w-56 placeholder:text-muted-foreground/50"
               />
             </div>
@@ -93,6 +94,7 @@ export const TagsPage = () => {
               </button>
               <button
                 onClick={() => setIsNewLabelOpen(true)}
+                title="Create a new tag label"
                 className="h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors flex items-center gap-2 premium-shadow shrink-0 whitespace-nowrap"
               >
                 <Plus size={16} /> <span className="hidden sm:inline">New Tag</span><span className="sm:hidden">New</span>
@@ -149,6 +151,7 @@ export const TagsPage = () => {
                   <div className="flex items-center gap-3 sm:gap-4 shrink-0">
                     <button
                       onClick={() => navigate(`/editor?tag=${encodeURIComponent(tag.name)}`)}
+                      title={`View all notes tagged with ${tag.name}`}
                       className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors font-medium"
                     >
                       <FileText size={14} className="shrink-0" />

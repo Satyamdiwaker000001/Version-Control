@@ -64,3 +64,31 @@ export interface Tag {
   name: string;
   color: string;
 }
+
+export type NotificationType = 'comment' | 'mention' | 'version' | 'system' | 'security';
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  text: string;
+  time: string; // ISO String
+  read: boolean;
+  link?: string;
+}
+
+export interface NotificationPreferences {
+  email: {
+    dailyDigest: boolean;
+    activityUpdates: boolean;
+    marketing: boolean;
+  };
+  push: {
+    enabled: boolean;
+    mentions: boolean;
+    nodeUpdates: boolean;
+  };
+  sslack: {
+    enabled: boolean;
+    channel: string;
+  };
+}

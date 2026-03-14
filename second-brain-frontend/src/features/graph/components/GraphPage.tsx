@@ -1,267 +1,227 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
-import ForceGraph2D from 'react-force-graph-2d';
-import type { NodeObject } from 'react-force-graph-2d';
+import { useState, useMemo } from 'react';
 import { useNoteStore } from '@/features/notes/store/useNoteStore';
 import type { NoteState } from '@/features/notes/store/useNoteStore';
-import { useThemeStore } from '@/shared/store/useThemeStore';
-import type { ThemeState } from '@/shared/store/useThemeStore';
-import { useTagStore } from '@/features/tags/store/useTagStore';
 import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
-import { Network, ZoomIn, ZoomOut, Filter, MousePointer2, Focus } from 'lucide-react';
+import { GitBranch, Filter, GitCommit, Search, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { cn } from '@/shared/utils/cn';
 import { Button } from '@/shared/ui/Button';
-
-interface GraphNode {
-  id: string;
-  name: string;
-  val: number;
-  color: string;
-  fontColor: string;
-  isPinned: boolean;
-  x?: number;
-  y?: number;
-}
-
-interface GraphLink {
-  source: string | GraphNode;
-  target: string | GraphNode;
-  color: string;
-}
+import { GitGraph, GitCommitData } from './GitGraph';
 
 export const GraphPage = () => {
   const notes = useNoteStore((state: NoteState) => state.notes);
-  const isDarkMode = useThemeStore((state: ThemeState) => state.isDarkMode);
+  const teamActivity = useNoteStore((state: NoteState) => state.teamActivity);
   const activeWorkspace = useWorkspaceStore(state => state.activeWorkspace);
   const navigate = useNavigate();
-  const fgRef = useRef<any>(null);
-  const [containerRef, setContainerRef] = useState<HTMLDivElement | null>(null);
-
-  const { tags, loadTags } = useTagStore();
+  
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
-  const [hoverNode, setHoverNode] = useState<string | null>(null);
-  
-  const [highlightNodes, setHighlightNodes] = useState(new Set<string>());
-  const [highlightLinks, setHighlightLinks] = useState(new Set<GraphLink>());
-  
-  useEffect(() => {
-    if (tags.length === 0) loadTags();
-  }, [tags.length, loadTags]);
-
-  useEffect(() => {
-    if (containerRef) {
-      const resizeObserver = new ResizeObserver(entries => {
-        if (!entries || !entries.length) return;
-        setDimensions({
-          width: entries[0].contentRect.width,
-          height: entries[0].contentRect.height
-        });
-      });
-      resizeObserver.observe(containerRef);
-      return () => resizeObserver.disconnect();
-    }
-  }, [containerRef]);
-
-  // Transform notes into Graph Data with Workspace Filtering
-  const graphData = useMemo(() => {
+  // Transform notes and activity into Git-style Commits
+  const commitData = useMemo(() => {
     const workspaceNotes = notes.filter(n => n.workspaceId === activeWorkspace?.id);
-    const filteredNotes = activeTag 
-      ? workspaceNotes.filter(n => n.tags.includes(activeTag))
-      : workspaceNotes;
+    
+    // Seed data for a more interesting graph
+    const baseCommits: GitCommitData[] = [
+      {
+        id: 'seed-1',
+        sha: '7f3a2b1',
+        message: 'Initial workspace structure',
+        author: { name: 'System', color: '#10b981' },
+        date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
+        branch: 'master',
+        status: 'merged',
+        changes: { added: 12, modified: 0, removed: 0 }
+      },
+      {
+        id: 'seed-2',
+        sha: 'a1b2c3d',
+        message: 'Established core knowledge schemas',
+        author: { name: 'System', color: '#10b981' },
+        date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 6).toISOString(),
+        branch: 'master',
+        status: 'merged',
+        changes: { added: 45, modified: 2, removed: 0 }
+      },
+      {
+        id: 'seed-3',
+        sha: 'e5f6g7h',
+        message: 'Feature exploration: Machine Learning notes',
+        author: { name: 'Alex', color: '#3b82f6' },
+        date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
+        branch: 'machine-learning',
+        status: 'active',
+        changes: { added: 85, modified: 10, removed: 2 }
+      },
+      {
+        id: 'seed-4',
+        sha: 'i9j0k1l',
+        message: 'Drafting project roadmap',
+        author: { name: 'Sarah', color: '#e67e22' },
+        date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 4).toISOString(),
+        branch: 'roadmap',
+        status: 'active',
+        changes: { added: 20, modified: 5, removed: 0 }
+      },
+      {
+        id: 'seed-5',
+        sha: 'q5r6s7t',
+        message: 'Synced latest research papers',
+        author: { name: 'System', color: '#8b5cf6' },
+        date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
+        branch: 'research',
+        status: 'merged',
+        changes: { added: 150, modified: 0, removed: 0 }
+      }
+    ];
 
-    const nodes: GraphNode[] = filteredNotes.map((n: any) => ({
-      id: n.id,
-      name: n.title,
-      val: Math.max((n.backlinks?.length || 0) * 3, 6),
-      isPinned: !!n.isPinned,
-      color: n.isPinned ? '#8b5cf6' : (isDarkMode ? '#3f3f46' : '#e4e4e7'),
-      fontColor: isDarkMode ? '#a1a1aa' : '#71717a',
-    }));
+    const noteCommits: GitCommitData[] = workspaceNotes.flatMap((note, index) => {
+      const activity = teamActivity.filter(a => a.noteId === note.id);
+      
+      if (activity.length === 0) {
+        return [{
+          id: note.id,
+          sha: `c${index}${note.id.substring(0, 4)}`,
+          message: `Created: ${note.title}`,
+          author: { name: 'Me', color: '#6366f1' },
+          date: note.createdAt,
+          branch: note.tags[0] || 'master',
+          status: note.isPinned ? 'active' : 'merged',
+          changes: { added: Math.floor(note.content.length / 10) || 5, modified: 0, removed: 0 },
+          noteId: note.id
+        } as GitCommitData];
+      }
 
-    const links: GraphLink[] = [];
-    filteredNotes.forEach((note: any) => {
-      note.backlinks?.forEach((linkTargetId: string) => {
-        if (nodes.find(n => n.id === linkTargetId)) {
-          links.push({
-            source: note.id,
-            target: linkTargetId,
-            color: isDarkMode ? '#27272a' : '#f4f4f5'
-          });
-        }
-      });
+      return activity.map((a, aIdx) => ({
+        id: `${a.noteId}-${aIdx}`,
+        sha: `s${a.timestamp.substring(11, 19).replace(/:/g, '')}`,
+        message: a.commitMessage || `${a.action === 'created' ? 'Created' : 'Updated'} ${note.title}`,
+        author: { name: a.authorName, color: a.authorColor },
+        date: a.timestamp,
+        branch: note.tags[0] || 'master',
+        status: aIdx === 0 ? 'active' : 'merged',
+        changes: {
+          added: a.action === 'created' ? 15 : Math.floor(Math.random() * 5),
+          modified: a.action === 'edited' ? Math.floor(Math.random() * 10) : 0,
+          removed: Math.floor(Math.random() * 2)
+        },
+        noteId: note.id
+      } as GitCommitData));
     });
 
-    return { nodes, links };
-  }, [notes, isDarkMode, activeTag, activeWorkspace]);
+    const allCommits = [...baseCommits, ...noteCommits];
 
-  const handleNodeHover = (node: GraphNode | NodeObject | null) => {
-    if (node) {
-      const graphNode = node as GraphNode;
-      const neighbors = new Set<string>();
-      const neighborLinks = new Set<GraphLink>();
-
-      graphData.links.forEach((link: any) => {
-        const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-        const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-        
-        if (sourceId === graphNode.id) {
-          neighbors.add(targetId);
-          neighborLinks.add(link);
-        } else if (targetId === graphNode.id) {
-          neighbors.add(sourceId);
-          neighborLinks.add(link);
-        }
-      });
-
-      setHoverNode(graphNode.id);
-      setHighlightNodes(neighbors);
-      setHighlightLinks(neighborLinks);
-    } else {
-      setHoverNode(null);
-      setHighlightNodes(new Set());
-      setHighlightLinks(new Set());
-    }
-  };
+    // Final filters
+    return allCommits
+      .filter(c => !activeTag || c.branch === activeTag)
+      .filter(c => !searchQuery || c.message.toLowerCase().includes(searchQuery.toLowerCase()))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [notes, teamActivity, activeWorkspace, activeTag, searchQuery]);
 
   return (
     <div className="flex flex-col h-full bg-background animate-in fade-in duration-700 relative overflow-hidden">
       
-      {/* Premium Search & Control Interface */}
-      <div className="absolute top-4 sm:top-6 left-4 sm:left-6 right-4 sm:right-6 z-20 flex flex-col sm:flex-row items-start justify-between gap-4 pointer-events-none">
-        <div className="flex flex-col gap-3 sm:gap-4 pointer-events-auto w-full sm:w-auto">
-          <div className="glass border border-border rounded-2xl p-3 sm:p-4 shadow-2xl flex items-center justify-between sm:justify-start gap-3 sm:gap-6">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                <Network size={18} className="sm:hidden" />
-                <Network size={22} className="hidden sm:block" />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <h1 className="text-[11px] sm:text-sm font-extrabold tracking-tight text-foreground uppercase truncate">Neural Graph</h1>
-                <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase tracking-widest truncate">{activeWorkspace?.name || 'Local'}</span>
-              </div>
+      {/* Premium Header */}
+      <div className="sticky top-0 z-20 glass border-b border-border p-4 sm:p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+              <GitBranch size={24} className="animate-pulse" />
             </div>
-            <div className="h-6 sm:h-8 w-px bg-border"></div>
-            <div className="flex items-center gap-1 sm:gap-2">
-               <Button variant="ghost" size="sm" className="h-8 sm:h-9 gap-2 text-[10px] sm:text-xs font-bold text-muted-foreground hover:text-foreground group px-2 sm:px-3">
-                  <Filter size={13} className="shrink-0" /> <span className="truncate max-w-[60px] sm:max-w-none">{activeTag || 'ALL'}</span>
-               </Button>
-               <Button variant="ghost" size="icon" className="h-8 w-8 sm:h-9 sm:w-9 text-muted-foreground group">
-                  <MousePointer2 size={14} className="sm:hidden" />
-                  <MousePointer2 size={16} className="hidden sm:block" />
-               </Button>
+            <div className="flex flex-col">
+              <h1 className="text-lg sm:text-xl font-black tracking-tight text-foreground uppercase">Version Tree</h1>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] sm:text-[12px] font-bold text-muted-foreground uppercase tracking-widest">
+                  {activeWorkspace?.name || 'Local Workspace'}
+                </span>
+                <div className="w-1 h-1 rounded-full bg-border" />
+                <span className="text-[10px] sm:text-[12px] font-mono text-primary animate-pulse">
+                  {commitData.length} Commits
+                </span>
+              </div>
             </div>
           </div>
-          
-          {/* Active Tag Pills */}
-          <div className="flex flex-wrap gap-1.5 sm:gap-2 max-w-full sm:max-w-sm">
-             {tags.slice(0, 4).map(tag => (
-                <button 
-                  key={tag.id}
-                  onClick={() => setActiveTag(activeTag === tag.name ? null : tag.name)}
-                  className={cn(
-                    "px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[9px] sm:text-[10px] font-bold uppercase tracking-wider border transition-all shrink-0",
-                    activeTag === tag.name 
-                      ? "bg-primary text-primary-foreground border-primary" 
-                      : "bg-accent/50 text-muted-foreground border-border hover:border-primary/50"
-                  )}
-                >
-                  #{tag.name}
-                </button>
-             ))}
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+              <input 
+                type="text"
+                placeholder="Search history..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                title="Search commit messages and titles"
+                className="w-full pl-10 pr-4 py-2 bg-accent/50 border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+              />
+            </div>
+            <Button size="icon" variant="outline" className="shrink-0 rounded-xl" title="Add a manual entry to the version history">
+              <Plus size={18} />
+            </Button>
           </div>
         </div>
 
-        <div className="glass border border-border rounded-xl sm:rounded-2xl p-1 sm:p-1.5 shadow-2xl pointer-events-auto flex flex-row sm:flex-col gap-1 sm:gap-1 absolute bottom-[-180px] right-0 sm:static">
-          <Button variant="ghost" size="icon" onClick={() => fgRef.current?.zoom(fgRef.current.zoom() * 1.5, 400)} className="h-9 w-9 sm:h-10 sm:w-10 text-muted-foreground">
-            <ZoomIn size={18} />
+        {/* Filters */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+          <Button 
+            variant={activeTag === null ? "default" : "outline"} 
+            size="sm" 
+            onClick={() => setActiveTag(null)}
+            title="View all branches combined in one timeline"
+            className="rounded-full text-[10px] font-bold h-7 uppercase px-4"
+          >
+            All Branches
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => fgRef.current?.zoom(fgRef.current.zoom() / 1.5, 400)} className="h-9 w-9 sm:h-10 sm:w-10 text-muted-foreground">
-            <ZoomOut size={18} />
-          </Button>
-          <div className="hidden sm:block h-px w-6 bg-border mx-auto my-1"></div>
-          <div className="sm:hidden w-px h-6 bg-border my-auto mx-1"></div>
-          <Button variant="ghost" size="icon" onClick={() => fgRef.current?.centerAt(0, 0, 400)} className="h-9 w-9 sm:h-10 sm:w-10 text-muted-foreground">
-            <Focus size={18} />
-          </Button>
+          {Array.from(new Set(notes.flatMap(n => n.tags))).map(tag => (
+            <Button 
+              key={tag}
+              variant={activeTag === tag ? "default" : "secondary"} 
+              size="sm" 
+              onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+              className="rounded-full text-[10px] font-bold h-7 uppercase px-4 whitespace-nowrap"
+            >
+              <GitBranch size={10} className="mr-1" />
+              {tag}
+            </Button>
+          ))}
         </div>
       </div>
 
-      {/* Force Directed Graph Canvas */}
-      <div className="flex-1 w-full h-full relative" ref={setContainerRef}>
-        {containerRef && (
-          <ForceGraph2D
-            ref={fgRef}
-            width={dimensions.width}
-            height={dimensions.height}
-            graphData={graphData}
-            nodeLabel="name"
-            nodeColor="color"
-            nodeRelSize={2}
-            linkWidth={(link: any) => highlightLinks.has(link) ? 2 : 1}
-            linkColor={(link: any) => highlightLinks.has(link) ? '#8b5cf6' : isDarkMode ? '#27272a' : '#f1f1f1'}
-            onNodeHover={handleNodeHover}
-            onNodeClick={(node: any) => navigate(`/editor?noteId=${node.id}`)}
-            cooldownTicks={100}
-            d3AlphaDecay={0.02}
-            d3VelocityDecay={0.3}
-            nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
-              const label = node.name;
-              const fontSize = 12 / globalScale;
-              
-              const isHovered = hoverNode === node.id;
-              const isNeighbor = highlightNodes.has(node.id);
-              const isFaded = hoverNode && !isHovered && !isNeighbor;
-
-              // Draw Pulse Effect for Pinned/Highlighted
-              if ((node.isPinned || isHovered) && !isFaded) {
-                const time = Date.now() / 1000;
-                const pulse = Math.sin(time * 3) * 0.5 + 0.5;
-                ctx.beginPath();
-                ctx.arc(node.x, node.y, node.val + (2 + pulse * 4) / globalScale, 0, 2 * Math.PI, false);
-                ctx.fillStyle = isHovered ? 'rgba(139, 92, 246, 0.15)' : 'rgba(139, 92, 246, 0.08)';
-                ctx.fill();
-              }
-
-              // Draw Node
-              ctx.beginPath();
-              ctx.arc(node.x, node.y, node.val, 0, 2 * Math.PI, false);
-              
-              if (isHovered) {
-                ctx.fillStyle = '#8b5cf6';
-              } else if (isNeighbor) {
-                ctx.fillStyle = '#a78bfa';
-              } else if (isFaded) {
-                ctx.fillStyle = isDarkMode ? '#18181b' : '#fafafa';
-              } else {
-                ctx.fillStyle = node.color;
-              }
-              ctx.fill();
-
-              // Draw Border
-              ctx.strokeStyle = isHovered || isNeighbor ? '#8b5cf6' : (isDarkMode ? '#27272a' : '#e4e4e7');
-              ctx.lineWidth = 1 / globalScale;
-              ctx.stroke();
-
-              // Draw Label
-              if (!isFaded && (globalScale > 1.2 || isHovered || isNeighbor)) {
-                ctx.font = `${isHovered || isNeighbor ? 'bold' : 'normal'} ${fontSize}px sans-serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillStyle = isHovered || isNeighbor ? (isDarkMode ? '#ffffff' : '#000000') : node.fontColor;
-                ctx.fillText(label, node.x, node.y + node.val + (fontSize * 1.5));
-              }
-            }}
-          />
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        {commitData.length > 0 ? (
+          <div className="max-w-4xl mx-auto">
+            <GitGraph 
+              commits={commitData} 
+              onCommitClick={(commit) => commit.noteId && navigate(`/editor?noteId=${commit.noteId}`)}
+            />
+          </div>
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center text-center p-8">
+            <div className="w-20 h-20 rounded-full bg-accent flex items-center justify-center mb-4">
+              <Filter size={32} className="text-muted-foreground opacity-50" />
+            </div>
+            <h3 className="text-lg font-bold">No history found</h3>
+            <p className="text-muted-foreground text-sm max-w-xs">
+              Try adjusting your filters or search query to see the commit tree.
+            </p>
+          </div>
         )}
       </div>
 
-      {/* Legend / Stats Footer */}
-      <div className="absolute bottom-4 sm:bottom-6 left-4 sm:left-6 z-20 glass border border-border rounded-xl px-3 sm:px-4 py-1.5 sm:py-2 shadow-xl flex items-center gap-3 sm:gap-4 text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-         <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-primary shadow-[0_0_8px_rgba(139,92,246,0.5)]"></div> PINNED</div>
-         <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-border"></div> STANDARD</div>
-         <div className="flex items-center gap-1.5 text-foreground/80"><Network size={12} /> {graphData.nodes.length} <span className="hidden sm:inline">NODES</span></div>
+      {/* Footer Stats */}
+      <div className="p-4 border-t border-border glass flex items-center justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+            Synced
+          </div>
+          <div className="flex items-center gap-1.5">
+            <GitCommit size={12} />
+            {commitData.length} Total Changes
+          </div>
+        </div>
+        <div>
+          Last synced: JUST NOW
+        </div>
       </div>
 
     </div>

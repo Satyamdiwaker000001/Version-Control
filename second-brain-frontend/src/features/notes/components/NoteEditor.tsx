@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNoteStore, MOCK_TEAM_MEMBERS } from '@/features/notes/store/useNoteStore';
 import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
 import { 
@@ -14,14 +14,31 @@ import { Button } from '@/shared/ui/Button';
 import { cn } from '@/shared/utils/cn';
 import { formatDistanceToNow } from 'date-fns';
 
+// ─── Rich Text Editor imports ────────────────────────────────────────────
+import { useEditor } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Link from '@tiptap/extension-link';
+import ImageExt from '@tiptap/extension-image';
+import Placeholder from '@tiptap/extension-placeholder';
+import Underline from '@tiptap/extension-underline';
+import TextAlign from '@tiptap/extension-text-align';
+import { EditorContent } from '@tiptap/react';
+import { EditorToolbar } from './EditorToolbar';
+import { EmojiPicker } from './EmojiPicker';
+import { LinkInsertDialog } from './LinkInsertDialog';
+import { useFileAttachment } from './FileAttachment';
+import { PDFViewer } from './PDFViewer';
+import './editor-styles.css';
+
 interface NoteEditorProps {
   noteId: string | null;
   onTogglePanel: () => void;
   isPanelOpen: boolean;
   onSelectNote?: (id: string) => void;
+  onAiClick?: () => void;
 }
 
-export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote }: NoteEditorProps) => {
+export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote, onAiClick }: NoteEditorProps) => {
   const note = useNoteStore(state => state.notes.find(n => n.id === noteId));
   const updateNote = useNoteStore(state => state.updateNote);
   const deleteNote = useNoteStore(state => state.deleteNote);
@@ -40,34 +57,119 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote }:
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [tagSearch, setTagSearch] = useState('');
 
+  // ─── Rich Editor State ─────────────────────────────────────────────────
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [pdfAttachments, setPdfAttachments] = useState<Array<{ dataUrl: string; fileName: string; fileSize: number }>>([]);
+  const emojiAnchorRef = useRef<HTMLDivElement>(null);
+
   const { tags: globalTags, loadTags } = useTagStore();
 
   useEffect(() => {
     loadTags();
   }, [loadTags]);
 
+  // ─── TipTap Editor Instance ────────────────────────────────────────────
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        heading: { levels: [1, 2, 3] },
+        codeBlock: { HTMLAttributes: { class: 'code-block' } },
+      }),
+      Link.configure({
+        openOnClick: true,
+        autolink: true,
+        HTMLAttributes: { target: '_blank', rel: 'noopener noreferrer' },
+      }),
+      ImageExt.configure({
+        inline: false,
+        allowBase64: true,
+        HTMLAttributes: { class: 'editor-image' },
+      }),
+      Placeholder.configure({ placeholder: 'Start writing...' }),
+      Underline,
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
+    ],
+    content: note?.content || '',
+    onUpdate: ({ editor }) => {
+      setContent(editor.getHTML());
+    },
+    editorProps: {
+      attributes: {
+        class: 'tiptap-editor',
+      },
+      handleDrop: (view, event, _slice, moved) => {
+        if (!moved && event.dataTransfer?.files.length) {
+          const files = Array.from(event.dataTransfer.files);
+          files.forEach(file => {
+            if (file.type.startsWith('image/')) {
+              const reader = new FileReader();
+              reader.onload = () => {
+                const src = reader.result as string;
+                view.dispatch(view.state.tr.replaceSelectionWith(
+                  view.state.schema.nodes.image.create({ src })
+                ));
+              };
+              reader.readAsDataURL(file);
+            }
+          });
+          return true;
+        }
+        return false;
+      },
+      handlePaste: (view, event) => {
+        const items = Array.from(event.clipboardData?.items || []);
+        for (const item of items) {
+          if (item.type.startsWith('image/')) {
+            event.preventDefault();
+            const file = item.getAsFile();
+            if (!file) continue;
+            const reader = new FileReader();
+            reader.onload = () => {
+              const src = reader.result as string;
+              view.dispatch(view.state.tr.replaceSelectionWith(
+                view.state.schema.nodes.image.create({ src })
+              ));
+            };
+            reader.readAsDataURL(file);
+            return true;
+          }
+        }
+        return false;
+      },
+    },
+  });
+
+  // Sync content when switching notes
+  useEffect(() => {
+    if (note && editor) {
+      const currentHTML = editor.getHTML();
+      if (note.content !== currentHTML) {
+        editor.commands.setContent(note.content || '');
+        setContent(note.content || '');
+      }
+      setTitle(note.title || '');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noteId, note?.id]);
+
+  // ─── File Attachment Handler ───────────────────────────────────────────
+  const { openFilePicker, openImagePicker, fileInputRef, imageInputRef, handleFileChange, handleImageChange } = useFileAttachment({
+    onInsertHTML: (html: string) => {
+      editor?.chain().focus().insertContent(html).run();
+    },
+    onInsertImage: (src: string, alt?: string) => {
+      editor?.chain().focus().setImage({ src, alt: alt || '' }).run();
+    },
+    onPDFAttach: (dataUrl: string, fileName: string, fileSize: number) => {
+      setPdfAttachments(prev => [...prev, { dataUrl, fileName, fileSize }]);
+    },
+  });
+
   const isDirty = useMemo(() => {
     if (!note) return false;
     return content !== note.content || title !== note.title;
   }, [content, title, note]);
-
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // State reset is handled by key prop in parent (NoteEditorPage.tsx)
-
-  const handleTitleBlur = () => {
-    if (note && title !== note.title) {
-      renameNote(note.id, title);
-      toast.success('Note renamed');
-    }
-  };
-
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
-  }, [content]);
 
   if (!noteId || !note) {
     return (
@@ -87,6 +189,7 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote }:
           variant="outline"
           size="sm"
           className="mt-6 gap-2 premium-shadow"
+          title="Create a new note"
           onClick={() => {
             const id = `n${Date.now()}`;
             useNoteStore.getState().createNote({
@@ -114,7 +217,7 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote }:
     : null;
 
   const creator = isTeam ? MOCK_TEAM_MEMBERS.find(m => m.id === note.userId) : null;
-  const lastEditor = lastActivity
+  const lastEditor_member = lastActivity
     ? MOCK_TEAM_MEMBERS.find(m => m.id === lastActivity.authorId)
     : creator;
 
@@ -169,15 +272,73 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote }:
     }
   };
 
+  const handleAiSuggest = () => {
+    if (onAiClick) onAiClick();
+    toast.promise(
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+      {
+        loading: 'AI is analyzing your note...',
+        success: 'AI Suggested: Try adding a summary section for better clarity.',
+        error: 'AI failed to generate suggestions',
+      }
+    );
+  };
+
+  const handleAddBlock = () => {
+    editor?.chain().focus().insertContent('<h2>New Section</h2><p>Start writing here...</p>').run();
+    toast.info('New section block added');
+  };
+
+  // ─── Emoji Insert ──────────────────────────────────────────────────────
+  const handleEmojiSelect = (emoji: string) => {
+    editor?.chain().focus().insertContent(emoji).run();
+  };
+
+  // ─── Link Insert ───────────────────────────────────────────────────────
+  const handleLinkInsert = (url: string, text: string) => {
+    if (editor) {
+      const { from, to } = editor.state.selection;
+      const hasSelection = from !== to;
+      if (hasSelection) {
+        editor.chain().focus().setLink({ href: url }).run();
+      } else {
+        editor.chain().focus().insertContent(`<a href="${url}" target="_blank">${text}</a>`).run();
+      }
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col bg-background h-full overflow-hidden relative">
+      {/* Hidden file inputs */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.doc,.docx,.txt,.csv,.xlsx,.pptx,image/*"
+        onChange={handleFileChange}
+        className="hidden"
+        multiple
+      />
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImageChange}
+        className="hidden"
+        multiple
+      />
+
+      {/* ─── Top Header Bar ─────────────────────────────────────────────── */}
       <div className="h-12 flex items-center justify-between px-4 shrink-0 border-b border-border/50">
-        <div className="flex items-center gap-1 text-[11px] sm:text-[13px] text-muted-foreground min-w-0 flex-1 mr-2">
-          <span className="hover:bg-accent px-1.5 py-0.5 rounded cursor-pointer transition-colors shrink-0 hidden md:block truncate">
-            {activeWorkspace?.name || 'Workspace'}
-          </span>
-          <ChevronRight size={12} className="text-border shrink-0 hidden md:block" />
-          <span className="px-1.5 py-0.5 rounded truncate text-foreground/80 font-medium">
+        <div className="flex items-center gap-1 text-[11px] sm:text-[13px] text-muted-foreground min-w-0 flex-1 mr-4 overflow-hidden">
+          {!isPanelOpen && (
+            <>
+              <span className="hover:bg-accent px-1.5 py-0.5 rounded cursor-pointer transition-colors shrink-0 hidden lg:block truncate max-w-[100px]">
+                {activeWorkspace?.name || 'Workspace'}
+              </span>
+              <ChevronRight size={12} className="text-border shrink-0 hidden lg:block" />
+            </>
+          )}
+          <span className="px-1.5 py-0.5 rounded truncate text-foreground font-extrabold flex-1 min-w-0">
             {title || 'Untitled'}
           </span>
         </div>
@@ -199,12 +360,12 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote }:
 
           <div className="hidden sm:flex items-center gap-1">
             {isTeam && (
-              <div className="hidden md:flex -space-x-1.5 mx-2">
+              <div className="hidden xl:flex -space-x-1.5 mx-3">
                 {MOCK_TEAM_MEMBERS.slice(0, 3).map(m => (
                   <div
                     key={m.id}
                     title={`${m.name} — viewing`}
-                    className="w-7 h-7 rounded-full border-2 border-background text-[10px] font-bold text-white flex items-center justify-center cursor-default"
+                    className="w-7 h-7 rounded-full border-2 border-background text-[10px] font-bold text-white flex items-center justify-center cursor-default transition-transform hover:scale-110"
                     style={{ backgroundColor: m.color }}
                   >
                     {m.initials[0]}
@@ -213,17 +374,33 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote }:
               </div>
             )}
 
-            <Button variant="ghost" size="sm" className="h-9 gap-1.5 text-muted-foreground" onClick={handleShare}>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-9 gap-1.5 text-muted-foreground" 
+              onClick={handleShare}
+              title="Share this note"
+            >
               <Share2 size={16} /> Share
             </Button>
             <Button
               variant="ghost" size="sm"
               className="h-9 w-9 text-muted-foreground"
-              onClick={() => togglePin(note.id)}
+              onClick={() => {
+                togglePin(note.id);
+                toast.info(note.isPinned ? 'Note unpinned' : 'Note pinned');
+              }}
+              title={note.isPinned ? "Unpin note" : "Pin note"}
             >
               <Pin size={16} className={cn(note.isPinned && 'fill-amber-500 text-amber-500')} />
             </Button>
-            <Button variant="ghost" size="sm" className="h-9 w-9 text-primary opacity-70">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-9 w-9 text-primary opacity-70"
+              onClick={handleAiSuggest}
+              title="AI Assistant Suggestion"
+            >
               <Sparkles size={16} />
             </Button>
             <div className="w-px h-4 bg-border mx-1" />
@@ -233,6 +410,7 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote }:
               onClick={handleSave}
               disabled={!isDirty}
               className="h-9 gap-2"
+              title="Save version history (Commit)"
             >
               <Save size={16} />
               <span className="hidden sm:inline">Commit</span>
@@ -240,34 +418,82 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote }:
             <Button
               variant="ghost"
               size="sm"
-              className="h-9 w-9 text-muted-foreground"
+              className="h-9 w-9 text-muted-foreground hover:bg-accent rounded-lg"
               onClick={onTogglePanel}
+              title={isPanelOpen ? "Close side panel" : "Open side panel"}
             >
-              {isPanelOpen ? <PanelRightClose size={16} /> : <PanelRight size={16} />}
+              {isPanelOpen ? <PanelRightClose size={18} /> : <PanelRight size={18} />}
             </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground" onClick={handleDelete}>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-9 w-9 text-muted-foreground" 
+              onClick={handleDelete}
+              title="Delete this note"
+            >
               <Trash2 size={16} />
             </Button>
           </div>
 
           <div className="flex sm:hidden items-center gap-1">
-             <Button variant={isDirty ? 'default' : 'ghost'} size="sm" onClick={handleSave} disabled={!isDirty} className="h-8 w-8 p-0">
+             <Button 
+               variant={isDirty ? 'default' : 'ghost'} 
+               size="sm" 
+               onClick={handleSave} 
+               disabled={!isDirty} 
+               className="h-8 w-8 p-0"
+               title="Commit changes"
+             >
                 <Save size={16} />
               </Button>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={onTogglePanel}>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 w-8 p-0" 
+                onClick={onTogglePanel}
+                title="Toggle sidebar"
+              >
                 {isPanelOpen ? <PanelRightClose size={16} /> : <PanelRight size={16} />}
               </Button>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground" onClick={handleShare}>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 w-8 p-0 text-muted-foreground" 
+                onClick={handleShare}
+                title="Share note"
+              >
                 <MoreHorizontal size={18} />
               </Button>
           </div>
         </div>
       </div>
 
+      {/* ─── Editor Toolbar ─────────────────────────────────────────────── */}
+      <div className="relative" ref={emojiAnchorRef}>
+        <EditorToolbar
+          editor={editor}
+          onEmojiClick={() => setShowEmojiPicker(prev => !prev)}
+          onLinkClick={() => setShowLinkDialog(true)}
+          onImageClick={() => openImagePicker()}
+          onFileClick={() => openFilePicker()}
+        />
+        <EmojiPicker
+          isOpen={showEmojiPicker}
+          onClose={() => setShowEmojiPicker(false)}
+          onSelect={handleEmojiSelect}
+          anchorRef={emojiAnchorRef}
+        />
+      </div>
+
+      {/* ─── Editor Content Area ────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto w-full">
         <div className="max-w-3xl mx-auto px-6 sm:px-12 pt-12 pb-32">
           <div className="mb-4 opacity-0 hover:opacity-100 transition-opacity group flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg border-2 border-dashed border-border flex items-center justify-center hover:border-primary/50 hover:bg-accent transition-all cursor-pointer text-muted-foreground">
+            <div 
+              className="w-10 h-10 rounded-lg border-2 border-dashed border-border flex items-center justify-center hover:border-primary/50 hover:bg-accent transition-all cursor-pointer text-muted-foreground"
+              onClick={handleAddBlock}
+              title="Add new content block"
+            >
               <Plus size={18} />
             </div>
           </div>
@@ -275,10 +501,15 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote }:
           <textarea
             value={title}
             onChange={e => setTitle(e.target.value)}
-            onBlur={handleTitleBlur}
+            onBlur={() => {
+              if (note && title !== note.title) {
+                renameNote(note.id, title);
+                toast.success('Note renamed');
+              }
+            }}
             rows={1}
             placeholder="Untitled"
-            className="w-full text-4xl sm:text-5xl font-extrabold text-foreground bg-transparent border-none focus:ring-0 resize-none outline-none mb-6 placeholder:text-muted-foreground/20 leading-[1.1]"
+            className="w-full text-3xl sm:text-4xl md:text-5xl font-extrabold text-foreground bg-transparent border-none focus:ring-0 resize-none outline-none mb-6 placeholder:text-muted-foreground/20 leading-[1.1] transition-all"
             style={{ minHeight: '1.2em' }}
           />
 
@@ -291,13 +522,13 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote }:
                   </div>
                   <span className="text-xs" style={{ color: creator.color }}>{creator.name}</span>
                 </div>
-                {lastEditor && lastEditor.id !== creator.id && (
+                {lastEditor_member && lastEditor_member.id !== creator.id && (
                   <div className="flex items-center gap-1.5">
-                    <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ backgroundColor: lastEditor.color }}>
-                      {lastEditor.initials[0]}
+                    <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ backgroundColor: lastEditor_member.color }}>
+                      {lastEditor_member.initials[0]}
                     </div>
                     <span className="text-xs text-muted-foreground/60">
-                      last edited by <span className="font-semibold" style={{ color: lastEditor.color }}>{lastEditor.name}</span>
+                      last edited by <span className="font-semibold" style={{ color: lastEditor_member.color }}>{lastEditor_member.name}</span>
                     </span>
                   </div>
                 )}
@@ -334,6 +565,7 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote }:
                       <button 
                         onClick={() => handleRemoveTag(t)}
                         className="opacity-0 group-hover/tag:opacity-100 p-0.5 hover:bg-black/5 rounded-full transition-all"
+                        title={`Remove tag: ${t}`}
                       >
                         <Plus size={10} className="rotate-45" />
                       </button>
@@ -384,6 +616,7 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote }:
                   <button 
                     onClick={() => setIsAddingTag(true)}
                     className="p-1 hover:bg-accent rounded-full text-muted-foreground/40 hover:text-primary transition-all"
+                    title="Add new tag"
                   >
                     <Plus size={12} />
                   </button>
@@ -392,16 +625,31 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote }:
             </div>
           </div>
 
-          <textarea
-            ref={textareaRef}
-            value={content}
-            onChange={e => setContent(e.target.value)}
-            className="w-full min-h-[400px] resize-none text-foreground bg-transparent border-none focus:ring-0 leading-relaxed text-base sm:text-[17px] outline-none placeholder:text-muted-foreground/20 pb-40 font-[inherit]"
-            placeholder="Start writing..."
-          />
+          {/* ─── TipTap Rich Text Editor ─────────────────────────────────── */}
+          {editor && <EditorContent editor={editor} />}
+
+          {/* ─── PDF Attachments ─────────────────────────────────────────── */}
+          {pdfAttachments.map((pdf, i) => (
+            <PDFViewer
+              key={`pdf-${i}`}
+              dataUrl={pdf.dataUrl}
+              fileName={pdf.fileName}
+              fileSize={pdf.fileSize}
+              onClose={() => setPdfAttachments(prev => prev.filter((_, idx) => idx !== i))}
+            />
+          ))}
         </div>
       </div>
 
+      {/* ─── Link Insert Dialog ─────────────────────────────────────────── */}
+      <LinkInsertDialog
+        isOpen={showLinkDialog}
+        onClose={() => setShowLinkDialog(false)}
+        onInsert={handleLinkInsert}
+        initialText={editor?.state.selection.empty ? '' : editor?.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to) || ''}
+      />
+
+      {/* ─── Commit Modal ───────────────────────────────────────────────── */}
       <AnimatePresence>
         {isCommitting && (
           <div className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-background/60 backdrop-blur-sm">

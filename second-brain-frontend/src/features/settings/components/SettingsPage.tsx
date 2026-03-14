@@ -16,6 +16,7 @@ import type { ThemeMode } from '@/shared/store/useThemeStore';
 import { toast } from 'sonner';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNotificationStore } from '@/features/notifications/store/useNotificationStore';
 
 type SettingsTab = 'profile' | 'appearance' | 'github' | 'workspace' | 'security' | 'notifications' | 'billing' | 'advanced';
 
@@ -49,7 +50,7 @@ const ProfileSettings = () => {
       <div className="flex items-center justify-between mb-6">
         <div>
            <h2 className="text-lg font-bold text-foreground">Public Profile</h2>
-           <p className="text-sm text-muted-foreground">This is how others will see you on the platform.</p>
+           <p className="text-sm text-muted-foreground">This is how others will see you on Noetic.</p>
         </div>
         <button 
           onClick={handleSave} 
@@ -378,34 +379,152 @@ const SecuritySettings = () => {
 };
 
 const NotificationSettings = () => {
+  const { preferences, fetchPreferences, updatePreferences } = useNotificationStore();
+
+  useEffect(() => {
+    fetchPreferences();
+  }, [fetchPreferences]);
+
+  if (!preferences) return null;
+
+  const handleToggle = (category: keyof typeof preferences, key: string) => {
+    const section = preferences[category] as any;
+    updatePreferences({
+      [category]: {
+        ...section,
+        [key]: !section[key]
+      }
+    });
+    toast.success('Notification settings updated');
+  };
+
+  const Toggle = ({ active, onClick }: { active: boolean; onClick: () => void }) => (
+    <button 
+      onClick={onClick}
+      className={cn(
+        "w-10 h-5 rounded-full relative transition-colors duration-200 outline-none",
+        active ? "bg-primary" : "bg-muted"
+      )}
+    >
+      <motion.div 
+        animate={{ x: active ? 22 : 2 }}
+        className="absolute top-1 w-3 h-3 bg-white rounded-full shadow-sm"
+      />
+    </button>
+  );
+
   return (
-    <div className="animate-in fade-in slide-in-from-right-4 duration-300 space-y-6">
+    <div className="animate-in fade-in slide-in-from-right-4 duration-300 space-y-8">
       <div>
-        <h2 className="text-lg font-bold text-foreground">Notifications</h2>
-        <p className="text-sm text-muted-foreground">Choose how you want to be notified.</p>
+        <h2 className="text-xl font-bold text-foreground">Notifications</h2>
+        <p className="text-sm text-muted-foreground">Manage how and when you receive updates.</p>
       </div>
 
+      {/* Email Notifications */}
       <div className="space-y-4">
-        {[
-          { title: 'Email Notifications', desc: 'Receive daily digests and activity updates.', icon: Bell },
-          { title: 'Web Push', desc: 'Real-time alerts in your browser.', icon: Globe },
-          { title: 'Slack Integration', desc: 'Send activity to your Slack workspace.', icon: Zap },
-        ].map((item, j) => (
-          <div key={j} className="flex items-center justify-between p-4 border border-border rounded-xl">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-muted rounded-lg text-muted-foreground">
-                <item.icon size={18} />
-              </div>
+        <h3 className="text-sm font-bold text-foreground uppercase tracking-widest flex items-center gap-2">
+          <Mail size={16} className="text-primary" /> Email Subscriptions
+        </h3>
+        <div className="grid gap-3">
+          {[
+            { id: 'dailyDigest', title: 'Daily Digest', desc: 'A summary of your workspace activity sent every morning.' },
+            { id: 'activityUpdates', title: 'Activity Updates', desc: 'Real-time emails for mentions and important changes.' },
+            { id: 'marketing', title: 'Product Updates', desc: 'News about new features and product improvements.' },
+          ].map((item) => (
+            <div key={item.id} className="flex items-center justify-between p-4 border border-border rounded-xl bg-card/50">
               <div>
                 <p className="text-sm font-semibold text-foreground">{item.title}</p>
                 <p className="text-xs text-muted-foreground">{item.desc}</p>
               </div>
+              <Toggle 
+                active={(preferences.email as any)[item.id]} 
+                onClick={() => handleToggle('email', item.id)} 
+              />
             </div>
-            <div className="w-10 h-5 bg-muted rounded-full relative cursor-pointer">
-              <div className="absolute left-1 top-1 w-3 h-3 bg-card rounded-full shadow-sm" />
+          ))}
+        </div>
+      </div>
+
+      {/* Push Notifications */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-bold text-foreground uppercase tracking-widest flex items-center gap-2">
+          <Globe size={16} className="text-primary" /> Browser Push
+        </h3>
+        <div className="grid gap-3">
+           <div className="flex items-center justify-between p-4 border border-border rounded-xl bg-card/50">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Enable Push Notifications</p>
+              <p className="text-xs text-muted-foreground">Receive alerts directly in your browser even when the tab is closed.</p>
             </div>
+            <Toggle 
+              active={preferences.push.enabled} 
+              onClick={() => handleToggle('push', 'enabled')} 
+            />
           </div>
-        ))}
+          {preferences.push.enabled && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="pl-4 space-y-3 overflow-hidden"
+            >
+              {[
+                { id: 'mentions', title: 'Mentions & Replies', desc: 'When someone tags you in a note or comment.' },
+                { id: 'nodeUpdates', title: 'Note Changes', desc: 'When a note you are watching is modified.' },
+              ].map((item) => (
+                <div key={item.id} className="flex items-center justify-between p-4 border border-border rounded-xl bg-card/50">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                    <p className="text-xs text-muted-foreground">{item.desc}</p>
+                  </div>
+                  <Toggle 
+                    active={(preferences.push as any)[item.id]} 
+                    onClick={() => handleToggle('push', item.id)} 
+                  />
+                </div>
+              ))}
+            </motion.div>
+          )}
+        </div>
+      </div>
+
+      {/* Sslack Integration */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-bold text-foreground uppercase tracking-widest flex items-center gap-2">
+          <Zap size={16} className="text-primary" /> Sslack Integration
+        </h3>
+        <div className="p-4 border border-border rounded-xl bg-card/50 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Connect to Sslack</p>
+              <p className="text-xs text-muted-foreground">Stream activity and alerts to a Sslack channel.</p>
+            </div>
+            <Toggle 
+              active={preferences.sslack.enabled} 
+              onClick={() => handleToggle('sslack', 'enabled')} 
+            />
+          </div>
+          {preferences.sslack.enabled && (
+             <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="space-y-2"
+            >
+              <label className="text-[10px] font-bold text-muted-foreground uppercase">Sslack Webhook URL / Channel</label>
+              <div className="flex gap-2">
+                <input 
+                  type="text"
+                  placeholder="https://hooks.slack.com/services/..."
+                  value={preferences.sslack.channel}
+                  onChange={(e) => updatePreferences({ sslack: { ...preferences.sslack, channel: e.target.value } })}
+                  className="flex-1 bg-background border border-border rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-primary outline-none"
+                />
+                <button className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-bold hover:bg-primary/90 transition-colors">
+                  Test
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </div>
       </div>
     </div>
   );
