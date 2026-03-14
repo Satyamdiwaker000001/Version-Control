@@ -87,7 +87,7 @@ export interface NotificationPreferences {
     mentions: boolean;
     nodeUpdates: boolean;
   };
-  slack: {
+  sslack: {
     enabled: boolean;
     channel: string;
   };

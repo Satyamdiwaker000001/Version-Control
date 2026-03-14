@@ -50,7 +50,7 @@ const ProfileSettings = () => {
       <div className="flex items-center justify-between mb-6">
         <div>
            <h2 className="text-lg font-bold text-foreground">Public Profile</h2>
-           <p className="text-sm text-muted-foreground">This is how others will see you on the platform.</p>
+           <p className="text-sm text-muted-foreground">This is how others will see you on Noetic.</p>
         </div>
         <button 
           onClick={handleSave} 
@@ -487,35 +487,35 @@ const NotificationSettings = () => {
         </div>
       </div>
 
-      {/* Slack Integration */}
+      {/* Sslack Integration */}
       <div className="space-y-4">
         <h3 className="text-sm font-bold text-foreground uppercase tracking-widest flex items-center gap-2">
-          <Zap size={16} className="text-primary" /> Slack Integration
+          <Zap size={16} className="text-primary" /> Sslack Integration
         </h3>
         <div className="p-4 border border-border rounded-xl bg-card/50 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-semibold text-foreground">Connect to Slack</p>
-              <p className="text-xs text-muted-foreground">Stream activity and alerts to a Slack channel.</p>
+              <p className="text-sm font-semibold text-foreground">Connect to Sslack</p>
+              <p className="text-xs text-muted-foreground">Stream activity and alerts to a Sslack channel.</p>
             </div>
             <Toggle 
-              active={preferences.slack.enabled} 
-              onClick={() => handleToggle('slack', 'enabled')} 
+              active={preferences.sslack.enabled} 
+              onClick={() => handleToggle('sslack', 'enabled')} 
             />
           </div>
-          {preferences.slack.enabled && (
+          {preferences.sslack.enabled && (
              <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               className="space-y-2"
             >
-              <label className="text-[10px] font-bold text-muted-foreground uppercase">Slack Webhook URL / Channel</label>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase">Sslack Webhook URL / Channel</label>
               <div className="flex gap-2">
                 <input 
                   type="text"
                   placeholder="https://hooks.slack.com/services/..."
-                  value={preferences.slack.channel}
-                  onChange={(e) => updatePreferences({ slack: { ...preferences.slack, channel: e.target.value } })}
+                  value={preferences.sslack.channel}
+                  onChange={(e) => updatePreferences({ sslack: { ...preferences.sslack, channel: e.target.value } })}
                   className="flex-1 bg-background border border-border rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-primary outline-none"
                 />
                 <button className="px-3 py-1.5 bg-primary text-primary-foreground rounded-md text-xs font-bold hover:bg-primary/90 transition-colors">

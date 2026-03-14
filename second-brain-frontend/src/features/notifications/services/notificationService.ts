@@ -18,7 +18,7 @@ const DEFAULT_PREFERENCES: NotificationPreferences = {
     mentions: true,
     nodeUpdates: false,
   },
-  slack: {
+  sslack: {
     enabled: false,
     channel: '',
   },
