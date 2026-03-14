@@ -14,6 +14,7 @@ export const NoteEditorPage = () => {
   const currentNoteId = searchParams.get('noteId');
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [showMobileTree, setShowMobileTree] = useState(false);
+  const [aiFocusCount, setAiFocusCount] = useState(0);
 
   const handleSelectNote = (id: string) => {
     setSearchParams({ noteId: id });
@@ -94,6 +95,10 @@ export const NoteEditorPage = () => {
           onSelectNote={handleSelectNote}
           onTogglePanel={() => setRightPanelOpen(v => !v)}
           isPanelOpen={rightPanelOpen}
+          onAiClick={() => {
+            setRightPanelOpen(true);
+            setAiFocusCount(v => v + 1);
+          }}
         />
       </div>
 
@@ -101,7 +106,7 @@ export const NoteEditorPage = () => {
       {currentNoteId && rightPanelOpen && (
         <div className="hidden lg:flex flex-col shrink-0 border-l border-border h-full overflow-hidden w-80">
           <div className="flex-1 min-h-[50%] overflow-hidden">
-            <NoteMetadataPanel noteId={currentNoteId} />
+            <NoteMetadataPanel noteId={currentNoteId} forceCollapse={aiFocusCount} />
           </div>
           <div className="h-px bg-border" />
           <div className="flex-1 min-h-[30%] overflow-hidden">
@@ -126,7 +131,7 @@ export const NoteEditorPage = () => {
               </Button>
             </div>
             <div className="flex-1 overflow-y-auto">
-              <NoteMetadataPanel noteId={currentNoteId} />
+              <NoteMetadataPanel noteId={currentNoteId} forceCollapse={aiFocusCount} />
               <div className="h-px bg-border my-4" />
               <AIPanel key={currentNoteId} noteId={currentNoteId} />
             </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNoteStore, MOCK_TEAM_MEMBERS } from '@/features/notes/store/useNoteStore';
 import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
 import {
@@ -36,7 +36,7 @@ const Section = ({ label, count, icon, isOpen, onToggle, children }: SectionProp
   </div>
 );
 
-export const NoteMetadataPanel = ({ noteId }: { noteId: string }) => {
+export const NoteMetadataPanel = ({ noteId, forceCollapse = 0 }: { noteId: string; forceCollapse?: number }) => {
   const note = useNoteStore(state => state.notes.find(n => n.id === noteId));
   const allNotes = useNoteStore(state => state.notes);
   const teamActivity = useNoteStore(state => state.teamActivity);
@@ -47,6 +47,14 @@ export const NoteMetadataPanel = ({ noteId }: { noteId: string }) => {
   const [isLinkedOpen, setIsLinkedOpen] = useState(true);
   const [isVersionsOpen, setIsVersionsOpen] = useState(true);
   const [isDiffOpen, setIsDiffOpen] = useState(false);
+
+  useEffect(() => {
+    if (forceCollapse > 0) {
+      setIsTagsOpen(false);
+      setIsLinkedOpen(false);
+      setIsVersionsOpen(false);
+    }
+  }, [forceCollapse]);
 
   if (!note) return null;
 

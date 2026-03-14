@@ -104,6 +104,7 @@ export const Header = ({
         <div className="flex-1 max-w-md hidden md:block">
           <button
             onClick={onOpenCommand}
+            title="Search notes and commands (⌘K)"
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-border bg-background/50 hover:bg-accent text-muted-foreground hover:text-foreground transition-all text-sm group"
           >
             <Search size={15} className="shrink-0" />
@@ -166,7 +167,7 @@ export const Header = ({
                         Mark all read
                       </button>
                     )}
-                    <button onClick={() => setNotifOpen(false)} className="text-muted-foreground hover:text-foreground">
+                    <button onClick={() => setNotifOpen(false)} title="Close notifications" className="text-muted-foreground hover:text-foreground">
                       <X size={14} />
                     </button>
                   </div>
@@ -199,7 +200,10 @@ export const Header = ({
                   )}
                 </div>
                 <div className="px-4 py-2.5 border-t border-border">
-                  <button className="text-xs text-primary font-semibold hover:underline w-full text-center">
+                  <button 
+                    className="text-xs text-primary font-semibold hover:underline w-full text-center"
+                    title="View full notification center"
+                  >
                     View all notifications
                   </button>
                 </div>
@@ -281,6 +285,7 @@ export const Header = ({
                   </div>
                   <button
                     onClick={() => setIsCreateOpen(true)}
+                    title="Open workspace creation wizard"
                     className="w-full flex items-center gap-2 px-2.5 py-2 mt-1 rounded-lg text-xs font-bold text-primary hover:bg-primary/10 transition-colors"
                   >
                     <Plus size={14} /> Create New Workspace

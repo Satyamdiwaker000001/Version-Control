@@ -78,10 +78,21 @@ const SoloDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) 
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigate('/graph')} className="flex-1 sm:flex-none gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => navigate('/graph')} 
+              className="flex-1 sm:flex-none gap-2"
+              title="View your notes in the version tree graph"
+            >
               <Share2 size={15} /> Graph
             </Button>
-            <Button size="sm" onClick={() => navigate('/editor?new=true')} className="flex-1 sm:flex-none gap-2 premium-shadow">
+            <Button 
+              size="sm" 
+              onClick={() => navigate('/editor?new=true')} 
+              className="flex-1 sm:flex-none gap-2 premium-shadow"
+              title="Create a new note in this workspace"
+            >
               <Plus size={15} /> New Note
             </Button>
           </div>
@@ -219,14 +230,15 @@ const SoloDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) 
               </CardHeader>
               <CardContent className="px-5 pb-5 space-y-2">
                 {[
-                  { label: 'Create a new note', icon: Pencil, action: () => navigate('/editor?new=true'), primary: true },
-                  { label: 'Explore Knowledge Graph', icon: Network, action: () => navigate('/graph') },
-                  { label: 'Connect a Repository', icon: FolderSync, action: () => navigate('/github') },
-                  { label: 'Manage Tags', icon: Hash, action: () => navigate('/tags') },
+                  { label: 'Create a new note', icon: Pencil, action: () => navigate('/editor?new=true'), primary: true, tooltip: 'Start writing a new note' },
+                  { label: 'Explore Knowledge Graph', icon: Network, action: () => navigate('/graph'), tooltip: 'Visualize note history' },
+                  { label: 'Connect a Repository', icon: FolderSync, action: () => navigate('/github'), tooltip: 'Sync with GitHub' },
+                  { label: 'Manage Tags', icon: Hash, action: () => navigate('/tags'), tooltip: 'Organize with tags' },
                 ].map((item, i) => (
                   <button
                     key={i}
                     onClick={item.action}
+                    title={item.tooltip}
                     className={cn(
                       'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left',
                       item.primary
@@ -338,13 +350,30 @@ const TeamDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) 
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigate('/projects')} className="flex-1 sm:flex-none gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => navigate('/projects')} 
+              className="flex-1 sm:flex-none gap-2"
+              title="Open team discussion and projects"
+            >
               <MessageSquare size={15} /> Chat
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/graph')} className="flex-1 sm:flex-none gap-2 hidden sm:flex">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => navigate('/graph')} 
+              className="flex-1 sm:flex-none gap-2 hidden sm:flex"
+              title="View team knowledge graph"
+            >
               <Share2 size={15} /> Graph
             </Button>
-            <Button size="sm" onClick={() => navigate('/editor?new=true')} className="flex-1 sm:flex-none gap-2 premium-shadow">
+            <Button 
+              size="sm" 
+              onClick={() => navigate('/editor?new=true')} 
+              className="flex-1 sm:flex-none gap-2 premium-shadow"
+              title="Create a new shared note"
+            >
               <Plus size={15} /> New Note
             </Button>
           </div>

@@ -9,6 +9,7 @@ import WorkspaceChat from '@/features/chat/components/WorkspaceChat';
 export const AppLayout = () => {
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const location = useLocation();
 
   // Close mobile sidebar on route change
@@ -39,10 +40,17 @@ export const AppLayout = () => {
       />
 
       <div className="flex-1 flex overflow-hidden relative">
-        {/* ── Desktop sidebar (always visible ≥lg) ── */}
-        <div className="hidden lg:flex shrink-0">
-          <Sidebar />
-        </div>
+        <motion.div 
+          initial={false}
+          animate={{ width: isSidebarCollapsed ? 80 : 256 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+          className="hidden lg:flex shrink-0 border-r border-border overflow-hidden bg-card"
+        >
+          <Sidebar 
+            isCollapsed={isSidebarCollapsed} 
+            onToggle={() => setIsSidebarCollapsed(v => !v)} 
+          />
+        </motion.div>
 
         {/* ── Mobile drawer overlay ── */}
         <AnimatePresence>
@@ -72,7 +80,7 @@ export const AppLayout = () => {
         </AnimatePresence>
 
         {/* ── Main content area ── */}
-        <main className="flex-1 overflow-y-auto w-full p-3 sm:p-5 lg:p-8 2xl:p-10 relative">
+        <main className="flex-1 overflow-y-auto w-full p-3 sm:p-5 lg:p-8 2xl:p-10 relative transition-all duration-300 ease-in-out">
           <div className="max-w-screen-2xl mx-auto h-full">
             <AnimatePresence mode="wait">
               <motion.div
