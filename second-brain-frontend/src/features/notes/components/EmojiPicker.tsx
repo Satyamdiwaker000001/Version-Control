@@ -1,13 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
-import { cn } from '@/shared/utils/cn';
 
 interface EmojiPickerProps {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (emoji: string) => void;
-  anchorRef?: React.RefObject<HTMLElement>;
 }
 
 export const EmojiPicker = ({ isOpen, onClose, onSelect }: EmojiPickerProps) => {
@@ -42,7 +40,7 @@ export const EmojiPicker = ({ isOpen, onClose, onSelect }: EmojiPickerProps) => 
     >
       <Picker
         data={data}
-        onEmojiSelect={(emoji: any) => {
+        onEmojiSelect={(emoji: { native: string }) => {
           onSelect(emoji.native);
           onClose();
         }}

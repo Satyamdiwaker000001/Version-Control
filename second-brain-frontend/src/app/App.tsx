@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useThemeStore } from '@/shared/store/useThemeStore';
 
 // Layouts
@@ -22,6 +22,16 @@ import { ProjectPage } from '@/features/projects/components/ProjectPage';
 
 // Store
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
+
+// Loading component
+const LoadingScreen = () => (
+  <div className="min-h-screen bg-background flex items-center justify-center">
+    <div className="text-center">
+      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+      <p className="text-muted-foreground">Loading...</p>
+    </div>
+  </div>
+);
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -45,10 +55,30 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 
 function App() {
   const initializeTheme = useThemeStore(state => state.initializeTheme);
+  const checkAuth = useAuthStore(state => state.checkAuth);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
-    initializeTheme();
-  }, [initializeTheme]);
+    const initializeApp = async () => {
+      // Initialize theme
+      initializeTheme();
+      
+      // Check authentication status
+      try {
+        await checkAuth();
+      } catch (error) {
+        console.error('Auth check failed:', error);
+      }
+      
+      setIsInitialized(true);
+    };
+
+    initializeApp();
+  }, [initializeTheme, checkAuth]);
+
+  if (!isInitialized) {
+    return <LoadingScreen />;
+  }
 
   return (
     <>

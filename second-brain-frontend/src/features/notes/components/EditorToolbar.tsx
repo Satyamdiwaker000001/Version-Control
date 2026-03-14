@@ -4,10 +4,9 @@ import {
   Heading1, Heading2, Heading3,
   List, ListOrdered, Quote, Minus,
   AlignLeft, AlignCenter, AlignRight,
-  Smile, Link2, ImagePlus, Paperclip, Undo2, Redo2,
+  Smile, Link2, ImagePlus, Paperclip, Undo2, Redo2, Wifi, Users
 } from 'lucide-react';
 import { cn } from '@/shared/utils/cn';
-import { useState, useRef } from 'react';
 
 interface EditorToolbarProps {
   editor: Editor | null;
@@ -15,6 +14,9 @@ interface EditorToolbarProps {
   onLinkClick?: () => void;
   onImageClick?: () => void;
   onFileClick?: () => void;
+  onGoLiveClick?: () => void;
+  isLiveMode?: boolean;
+  onlineUsersCount?: number;
 }
 
 const ToolbarButton = ({
@@ -46,7 +48,7 @@ const ToolbarButton = ({
 
 const Divider = () => <div className="w-px h-5 bg-border mx-0.5 shrink-0" />;
 
-export const EditorToolbar = ({ editor, onEmojiClick, onLinkClick, onImageClick, onFileClick }: EditorToolbarProps) => {
+export const EditorToolbar = ({ editor, onEmojiClick, onLinkClick, onImageClick, onFileClick, onGoLiveClick, isLiveMode, onlineUsersCount }: EditorToolbarProps) => {
   if (!editor) return null;
 
   return (
@@ -135,6 +137,29 @@ export const EditorToolbar = ({ editor, onEmojiClick, onLinkClick, onImageClick,
       <ToolbarButton onClick={() => onFileClick?.()} title="Attach File (PDF, DOCX)">
         <Paperclip size={15} />
       </ToolbarButton>
+
+      <Divider />
+
+      {/* Collaboration Controls */}
+      <div className="flex items-center gap-1 px-2">
+        {isLiveMode ? (
+          <div className="flex items-center gap-1 px-2 py-1 bg-green-500/10 rounded-md">
+            <Wifi size={12} className="text-green-500" />
+            <span className="text-xs text-green-600 font-medium">Live</span>
+            {onlineUsersCount !== undefined && (
+              <span className="text-xs text-green-600 ml-1">({onlineUsersCount})</span>
+            )}
+          </div>
+        ) : (
+          <ToolbarButton 
+            onClick={() => onGoLiveClick?.()} 
+            title="Start Live Collaboration"
+          >
+            <Users size={15} />
+            <span className="ml-1">Go Live</span>
+          </ToolbarButton>
+        )}
+      </div>
     </div>
   );
 };
