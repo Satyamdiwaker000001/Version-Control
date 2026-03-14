@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNoteStore, MOCK_TEAM_MEMBERS } from '@/features/notes/store/useNoteStore';
 import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
 import { 
@@ -27,7 +27,9 @@ import { EditorToolbar } from './EditorToolbar';
 import { EmojiPicker } from './EmojiPicker';
 import { LinkInsertDialog } from './LinkInsertDialog';
 import { useFileAttachment } from './FileAttachment';
-import { PDFViewer } from './PDFViewer';
+import { FileViewerWithComments } from './FileViewerWithComments';
+import { CollaborationIndicator } from './CollaborationIndicator';
+import { useCollaboration } from '../hooks/useCollaboration';
 import './editor-styles.css';
 
 interface NoteEditorProps {
@@ -53,7 +55,6 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote, o
   const [title, setTitle] = useState('');
   const [commitMessage, setCommitMessage] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
-  const [newTag, setNewTag] = useState('');
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [tagSearch, setTagSearch] = useState('');
 
@@ -61,7 +62,29 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote, o
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [pdfAttachments, setPdfAttachments] = useState<Array<{ dataUrl: string; fileName: string; fileSize: number }>>([]);
-  const emojiAnchorRef = useRef<HTMLDivElement>(null);
+  const [csvAttachments, setCsvAttachments] = useState<Array<{ dataUrl: string; fileName: string; fileSize: number }>>([]);
+  const [excelAttachments, setExcelAttachments] = useState<Array<{ dataUrl: string; fileName: string; fileSize: number }>>([]);
+
+  // ─── Collaboration State ─────────────────────────────────────────
+  const [isLiveMode, setIsLiveMode] = useState(false);
+  const [onlineUsersCount, setOnlineUsersCount] = useState(0);
+
+  // Initialize collaboration hook
+  const collaboration = useCollaboration({
+    fileName: note?.title || 'Untitled',
+    userId: 'current-user',
+    userName: 'You'
+  });
+
+  // Sync collaboration state
+  useEffect(() => {
+    setIsLiveMode(collaboration.isLiveMode);
+    setOnlineUsersCount(collaboration.onlineUsers.length);
+  }, [collaboration.isLiveMode, collaboration.onlineUsers]);
+
+  const handleGoLive = () => {
+    collaboration.toggleLiveMode();
+  };
 
   const { tags: globalTags, loadTags } = useTagStore();
 
@@ -164,6 +187,12 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote, o
     onPDFAttach: (dataUrl: string, fileName: string, fileSize: number) => {
       setPdfAttachments(prev => [...prev, { dataUrl, fileName, fileSize }]);
     },
+    onCSVAttach: (dataUrl: string, fileName: string, fileSize: number) => {
+      setCsvAttachments(prev => [...prev, { dataUrl, fileName, fileSize }]);
+    },
+    onExcelAttach: (dataUrl: string, fileName: string, fileSize: number) => {
+      setExcelAttachments(prev => [...prev, { dataUrl, fileName, fileSize }]);
+    },
   });
 
   const isDirty = useMemo(() => {
@@ -224,7 +253,6 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote, o
   const handleAddTag = (tagName: string) => {
     if (tagName.trim() && note) {
       useNoteStore.getState().addTag(note.id, tagName.trim());
-      setNewTag('');
       setTagSearch('');
       setIsAddingTag(false);
       toast.success('Tag added');
@@ -249,8 +277,12 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote, o
       toast.success('Version saved to history');
       setIsCommitting(false);
       setCommitMessage('');
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to save version');
+    } catch (err) {
+      if (err instanceof Error) {
+        toast.error(err.message || 'Failed to save version');
+      } else {
+        toast.error('Failed to save version');
+      }
     }
   };
 
@@ -267,7 +299,7 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote, o
       const shareUrl = `${window.location.origin}/share/${note.id}`;
       await navigator.clipboard.writeText(shareUrl);
       toast.success('Share link copied to clipboard!');
-    } catch (err) {
+    } catch {
       toast.error('Failed to copy share link');
     }
   };
@@ -469,19 +501,21 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote, o
       </div>
 
       {/* ─── Editor Toolbar ─────────────────────────────────────────────── */}
-      <div className="relative" ref={emojiAnchorRef}>
+      <div className="relative">
         <EditorToolbar
           editor={editor}
           onEmojiClick={() => setShowEmojiPicker(prev => !prev)}
           onLinkClick={() => setShowLinkDialog(true)}
-          onImageClick={() => openImagePicker()}
-          onFileClick={() => openFilePicker()}
+          onImageClick={openImagePicker}
+          onFileClick={openFilePicker}
+          onGoLiveClick={handleGoLive}
+          isLiveMode={isLiveMode}
+          onlineUsersCount={onlineUsersCount}
         />
         <EmojiPicker
           isOpen={showEmojiPicker}
           onClose={() => setShowEmojiPicker(false)}
           onSelect={handleEmojiSelect}
-          anchorRef={emojiAnchorRef}
         />
       </div>
 
@@ -628,28 +662,58 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote, o
           {/* ─── TipTap Rich Text Editor ─────────────────────────────────── */}
           {editor && <EditorContent editor={editor} />}
 
-          {/* ─── PDF Attachments ─────────────────────────────────────────── */}
+          {/* ─── File Attachments ─────────────────────────────────────────── */}
           {pdfAttachments.map((pdf, i) => (
-            <PDFViewer
+            <FileViewerWithComments
               key={`pdf-${i}`}
+              fileType="pdf"
               dataUrl={pdf.dataUrl}
               fileName={pdf.fileName}
               fileSize={pdf.fileSize}
               onClose={() => setPdfAttachments(prev => prev.filter((_, idx) => idx !== i))}
             />
           ))}
+          {csvAttachments.map((csv, i) => (
+            <FileViewerWithComments
+              key={`csv-${i}`}
+              fileType="csv"
+              dataUrl={csv.dataUrl}
+              fileName={csv.fileName}
+              fileSize={csv.fileSize}
+              onClose={() => setCsvAttachments(prev => prev.filter((_, idx) => idx !== i))}
+            />
+          ))}
+          {excelAttachments.map((excel, i) => (
+            <FileViewerWithComments
+              key={`excel-${i}`}
+              fileType="excel"
+              dataUrl={excel.dataUrl}
+              fileName={excel.fileName}
+              fileSize={excel.fileSize}
+              onClose={() => setExcelAttachments(prev => prev.filter((_, idx) => idx !== i))}
+            />
+          ))}
         </div>
       </div>
 
-      {/* ─── Link Insert Dialog ─────────────────────────────────────────── */}
+      {/* ─── Link Insert Dialog ─────────────────────────────────── */}
       <LinkInsertDialog
         isOpen={showLinkDialog}
         onClose={() => setShowLinkDialog(false)}
         onInsert={handleLinkInsert}
         initialText={editor?.state.selection.empty ? '' : editor?.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to) || ''}
       />
-
-      {/* ─── Commit Modal ───────────────────────────────────────────────── */}
+      
+      {/* ─── Collaboration Indicator ─────────────────────────────────── */}
+      {isLiveMode && (
+        <CollaborationIndicator
+          fileName={note?.title || 'Untitled'}
+          isLiveMode={isLiveMode}
+          onToggleLiveMode={handleGoLive}
+        />
+      )}
+      
+      {/* ─── Commit Modal ───────────────────────────────────────── */}
       <AnimatePresence>
         {isCommitting && (
           <div className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-background/60 backdrop-blur-sm">
