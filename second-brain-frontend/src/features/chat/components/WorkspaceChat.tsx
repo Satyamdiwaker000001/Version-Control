@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Send, X, MessageSquare, Smile, Hash, Users, Plus, Star, Menu } from 'lucide-react';
+import { toast } from 'sonner';
 import { useChatStore } from '../store/useChatStore';
 import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
 import { motion, AnimatePresence } from 'framer-motion';

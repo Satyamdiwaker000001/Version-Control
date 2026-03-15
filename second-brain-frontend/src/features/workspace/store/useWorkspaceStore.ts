@@ -1,33 +1,7 @@
 import { create } from 'zustand';
 import { workspaceService, type Workspace, type WorkspaceMember } from '../services/workspaceService';
 
-// ─── Mock data (offline fallback) ────────────────────────────────────────────
-const MOCK_WORKSPACES: Workspace[] = [
-  {
-    id: 'ws1',
-    name: 'My Knowledge Base',
-    slug: 'my-knowledge-base',
-    type: 'solo',
-    avatar: null,
-    description: 'Personal notes and research workspace',
-    githubOwner: null,
-    role: 'owner',
-    createdAt: new Date(Date.now() - 86400000 * 10).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-  {
-    id: 'ws2',
-    name: 'Team Research',
-    slug: 'team-research',
-    type: 'team',
-    avatar: null,
-    description: 'Shared workspace for collaborative research',
-    githubOwner: 'myorg',
-    role: 'owner',
-    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-    updatedAt: new Date().toISOString(),
-  },
-];
+// ─── No mock data (strictly dynamic) ────────────────────────────────────────────
 
 interface WorkspaceStore {
   workspaces: Workspace[];
@@ -47,9 +21,8 @@ interface WorkspaceStore {
 }
 
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
-  // Initialize with mock workspaces so dashboard renders immediately
-  workspaces: MOCK_WORKSPACES,
-  activeWorkspace: MOCK_WORKSPACES[0],
+  workspaces: [],
+  activeWorkspace: null,
   members: [],
   isLoading: false,
   error: null,

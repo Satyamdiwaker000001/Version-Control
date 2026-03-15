@@ -5,7 +5,7 @@ import {
   User, Palette, Github, Users, Shield, Save, 
   Moon, Sun, Monitor, RefreshCw, Lock, Bell,
   CreditCard, Trash2, Download, Globe, Zap,
-  Mail, Key, Laptop, ChevronRight, Check,
+  Mail, Check,
   Sparkles, Leaf, Gem, Waves,
   Cloud, Sunset, Coffee, Flame, Cpu
 } from 'lucide-react';

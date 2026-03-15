@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNoteStore, MOCK_TEAM_MEMBERS } from '@/features/notes/store/useNoteStore';
+import { useNoteStore } from '@/features/notes/store/useNoteStore';
 import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
 import { 
   Save, GitCommit, MoreHorizontal, Share2, Clock, 
@@ -71,7 +71,6 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote, o
 
   // Initialize collaboration hook
   const collaboration = useCollaboration({
-    fileName: note?.title || 'Untitled',
     userId: 'current-user',
     userName: 'You'
   });
@@ -245,10 +244,8 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote, o
         .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0]
     : null;
 
-  const creator = isTeam ? MOCK_TEAM_MEMBERS.find(m => m.id === note.userId) : null;
-  const lastEditor_member = lastActivity
-    ? MOCK_TEAM_MEMBERS.find(m => m.id === lastActivity.authorId)
-    : creator;
+  const creator = null; // No mock authors
+  const lastEditor_member = null;
 
   const handleAddTag = (tagName: string) => {
     if (tagName.trim() && note) {
@@ -391,20 +388,7 @@ export const NoteEditor = ({ noteId, onTogglePanel, isPanelOpen, onSelectNote, o
           </div>
 
           <div className="hidden sm:flex items-center gap-1">
-            {isTeam && (
-              <div className="hidden xl:flex -space-x-1.5 mx-3">
-                {MOCK_TEAM_MEMBERS.slice(0, 3).map(m => (
-                  <div
-                    key={m.id}
-                    title={`${m.name} — viewing`}
-                    className="w-7 h-7 rounded-full border-2 border-background text-[10px] font-bold text-white flex items-center justify-center cursor-default transition-transform hover:scale-110"
-                    style={{ backgroundColor: m.color }}
-                  >
-                    {m.initials[0]}
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* Team viewing indicator removed or replaced with dynamic logic later */}
 
             <Button 
               variant="ghost" 

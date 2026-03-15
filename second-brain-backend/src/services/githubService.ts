@@ -1,376 +1,318 @@
-// GitHub Integration Service
-import { PrismaClient } from "@prisma/client";
-import { Octokit } from "octokit";
-import {
-  Repository,
-  CreateRepositoryInput,
-  AppError,
-} from "../types";
+import { Octokit } from '@octokit/rest';
+import axios from 'axios';
+import { logger } from '@/utils/logger';
 
-const prisma = new PrismaClient();
+export interface GitHubUser {
+  id: number;
+  login: string;
+  name: string | null;
+  email: string | null;
+  avatar_url: string;
+  html_url: string;
+  bio: string | null;
+  location: string | null;
+  blog: string | null;
+  company: string | null;
+  public_repos: number;
+  followers: number;
+  following: number;
+  created_at: string;
+  updated_at: string;
+}
 
-export const githubService = {
-  // Get Octokit instance with token
-  getOctokit(accessToken: string): Octokit {
-    return new Octokit({
-      auth: accessToken,
-    });
-  },
+export interface GitHubRepository {
+  id: number;
+  name: string;
+  full_name: string;
+  description: string | null;
+  private: boolean;
+  fork: boolean;
+  language: string | null;
+  stargazers_count: number;
+  watchers_count: number;
+  forks_count: number;
+  open_issues_count: number;
+  html_url: string;
+  clone_url: string;
+  ssh_url: string;
+  default_branch: string;
+  pushed_at: string;
+  created_at: string;
+  updated_at: string;
+}
 
-  // Link GitHub repository to workspace
-  async linkRepository(
-    workspaceId: string,
-    userId: string,
-    input: CreateRepositoryInput
-  ): Promise<Repository> {
-    // Verify user is workspace member
-    const member = await prisma.workspaceMember.findUnique({
-      where: {
-        userId_workspaceId: { userId, workspaceId },
-      },
-    });
+export interface GitHubCommit {
+  sha: string;
+  commit: {
+    author: {
+      name: string;
+      email: string;
+      date: string;
+    };
+    message: string;
+  };
+  author: {
+    login: string;
+    avatar_url: string;
+    html_url: string;
+  } | null;
+  html_url: string;
+  stats: {
+    additions: number;
+    deletions: number;
+    total: number;
+  };
+  files: Array<{
+    filename: string;
+    additions: number;
+    deletions: number;
+    changes: number;
+    patch: string;
+  }>;
+}
 
-    if (!member || !["owner", "admin"].includes(member.role)) {
-      throw new AppError(403, "FORBIDDEN", "Only admins can link repositories");
-    }
+export class GitHubService {
+  private clientId: string;
+  private clientSecret: string;
+  private redirectUri: string;
 
-    // Check if repository already linked
-    const existingRepo = await prisma.repository.findUnique({
-      where: {
-        workspaceId_owner_name: {
-          workspaceId,
-          owner: input.owner,
-          name: input.name,
-        },
-      },
-    });
+  constructor() {
+    this.clientId = process.env.GITHUB_CLIENT_ID!;
+    this.clientSecret = process.env.GITHUB_CLIENT_SECRET!;
+    this.redirectUri = process.env.GITHUB_REDIRECT_URI!;
+  }
 
-    if (existingRepo) {
-      throw new AppError(
-        400,
-        "REPO_EXISTS",
-        "Repository already linked to workspace"
-      );
-    }
-
-    const repo = await prisma.repository.create({
-      data: {
-        workspaceId,
-        name: input.name,
-        owner: input.owner,
-        url: input.url,
-        description: input.description,
-        isPrivate: input.isPrivate || false,
-      },
-    });
-
-    return this.formatRepository(repo);
-  },
-
-  // Get linked repositories
-  async getWorkspaceRepositories(
-    workspaceId: string,
-    userId: string
-  ): Promise<Repository[]> {
-    // Verify user is workspace member
-    const member = await prisma.workspaceMember.findUnique({
-      where: {
-        userId_workspaceId: { userId, workspaceId },
-      },
-    });
-
-    if (!member) {
-      throw new AppError(403, "FORBIDDEN", "Access denied");
-    }
-
-    const repos = await prisma.repository.findMany({
-      where: { workspaceId },
-      orderBy: { name: "asc" },
-    });
-
-    return repos.map((repo) => this.formatRepository(repo));
-  },
-
-  // Get repository details
-  async getRepositoryById(repositoryId: string, userId: string): Promise<Repository> {
-    const repo = await prisma.repository.findUnique({
-      where: { id: repositoryId },
-      include: {
-        workspace: {
-          include: {
-            members: {
-              where: { userId },
-            },
-          },
-        },
-      },
+  public getAuthUrl(): string {
+    const scopes = ['user:email', 'repo', 'read:org'];
+    const params = new URLSearchParams({
+      client_id: this.clientId,
+      redirect_uri: this.redirectUri,
+      scope: scopes.join(' '),
+      response_type: 'code',
     });
 
-    if (!repo || repo.workspace.members.length === 0) {
-      throw new AppError(404, "REPOSITORY_NOT_FOUND", "Repository not found");
-    }
+    return `https://github.com/login/oauth/authorize?${params.toString()}`;
+  }
 
-    return this.formatRepository(repo);
-  },
-
-  // Unlink repository from workspace
-  async unlinkRepository(
-    repositoryId: string,
-    userId: string
-  ): Promise<void> {
-    const repo = await prisma.repository.findUnique({
-      where: { id: repositoryId },
-      include: {
-        workspace: {
-          include: {
-            members: {
-              where: { userId },
-            },
-          },
-        },
-      },
-    });
-
-    if (!repo) {
-      throw new AppError(404, "REPOSITORY_NOT_FOUND", "Repository not found");
-    }
-
-    // Only workspace owners can unlink
-    const member = await prisma.workspaceMember.findUnique({
-      where: {
-        userId_workspaceId: { userId, workspaceId: repo.workspaceId },
-      },
-    });
-
-    if (!member || member.role !== "owner") {
-      throw new AppError(403, "FORBIDDEN", "Only owner can unlink repositories");
-    }
-
-    // Delete linked notes
-    await prisma.noteRepository.deleteMany({
-      where: { repositoryId },
-    });
-
-    await prisma.repository.delete({
-      where: { id: repositoryId },
-    });
-  },
-
-  // Get commits from GitHub
-  async getCommits(
-    owner: string,
-    repo: string,
-    accessToken: string,
-    page: number = 1
-  ): Promise<any[]> {
+  public async exchangeCodeForToken(code: string): Promise<{ access_token: string; token_type: string; scope: string }> {
     try {
-      const octokit = this.getOctokit(accessToken);
-
-      const response = await octokit.rest.repos.listCommits({
-        owner,
-        repo,
-        page,
-        per_page: 20,
+      const response = await axios.post('https://github.com/login/oauth/access_token', {
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+        code,
+        redirect_uri: this.redirectUri,
+      }, {
+        headers: {
+          Accept: 'application/json',
+        },
       });
 
-      return response.data;
-    } catch (error: any) {
-      throw new AppError(
-        400,
-        "GITHUB_ERROR",
-        `Failed to fetch commits: ${error.message}`
-      );
-    }
-  },
+      if (response.data.error) {
+        throw new Error(response.data.error_description || 'OAuth exchange failed');
+      }
 
-  // Get branches from GitHub
-  async getBranches(
+      return response.data;
+    } catch (error) {
+      logger.error('Failed to exchange code for token:', error);
+      throw new Error('Failed to exchange authorization code for access token');
+    }
+  }
+
+  public async getUserInfo(accessToken: string): Promise<GitHubUser> {
+    try {
+      const octokit = new Octokit({
+        auth: accessToken,
+      });
+
+      const { data } = await octokit.rest.users.getAuthenticated();
+      
+      // Get user email if not public
+      if (!data.email) {
+        const emails = await octokit.rest.users.listEmailsForAuthenticatedUser();
+        const primaryEmail = emails.data.find(email => email.primary && email.verified);
+        data.email = primaryEmail?.email || null;
+      }
+
+      return data as GitHubUser;
+    } catch (error) {
+      logger.error('Failed to get GitHub user info:', error);
+      throw new Error('Failed to fetch GitHub user information');
+    }
+  }
+
+  public async getUserRepositories(accessToken: string): Promise<GitHubRepository[]> {
+    try {
+      const octokit = new Octokit({
+        auth: accessToken,
+      });
+
+      const repositories: GitHubRepository[] = [];
+      let page = 1;
+      const perPage = 100;
+
+      while (true) {
+        const { data } = await octokit.rest.repos.listForAuthenticatedUser({
+          page,
+          per_page: perPage,
+          sort: 'updated',
+          direction: 'desc',
+        });
+
+        if (data.length === 0) break;
+
+        repositories.push(...data.map(repo => ({
+        ...repo,
+        pushed_at: repo.pushed_at || new Date().toISOString(),
+        created_at: repo.created_at || new Date().toISOString(),
+        updated_at: repo.updated_at || new Date().toISOString(),
+      })));
+        page++;
+
+        if (data.length < perPage) break;
+      }
+
+      return repositories;
+    } catch (error) {
+      logger.error('Failed to get GitHub repositories:', error);
+      throw new Error('Failed to fetch GitHub repositories');
+    }
+  }
+
+  public async getRepositoryCommits(
+    accessToken: string,
     owner: string,
     repo: string,
-    accessToken: string
-  ): Promise<any[]> {
+    since?: string,
+    until?: string,
+    perPage: number = 100
+  ): Promise<GitHubCommit[]> {
     try {
-      const octokit = this.getOctokit(accessToken);
+      const octokit = new Octokit({
+        auth: accessToken,
+      });
 
-      const response = await octokit.rest.repos.listBranches({
+      const commits: GitHubCommit[] = [];
+      let page = 1;
+
+      while (true) {
+        const { data } = await octokit.rest.repos.listCommits({
+          owner,
+          repo,
+          page,
+          per_page: perPage,
+          since,
+          until,
+        });
+
+        if (data.length === 0) break;
+
+        // Get detailed commit info including stats
+        for (const commit of data) {
+          try {
+            const { data: detailedCommit } = await octokit.rest.repos.getCommit({
+              owner,
+              repo,
+              ref: commit.sha,
+            });
+            commits.push(detailedCommit as GitHubCommit);
+          } catch (error) {
+            // If we can't get detailed info, use basic commit
+            commits.push(commit as GitHubCommit);
+          }
+        }
+
+        page++;
+
+        if (data.length < perPage) break;
+
+        // Avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      return commits;
+    } catch (error) {
+      logger.error('Failed to get repository commits:', error);
+      throw new Error('Failed to fetch repository commits');
+    }
+  }
+
+  public async getRepositoryDetails(
+    accessToken: string,
+    owner: string,
+    repo: string
+  ): Promise<GitHubRepository> {
+    try {
+      const octokit = new Octokit({
+        auth: accessToken,
+      });
+
+      const { data } = await octokit.rest.repos.get({
         owner,
         repo,
+      });
+
+      return data as GitHubRepository;
+    } catch (error) {
+      logger.error('Failed to get repository details:', error);
+      throw new Error('Failed to fetch repository details');
+    }
+  }
+
+  public async searchRepositories(
+    accessToken: string,
+    query: string,
+    sort: 'stars' | 'forks' | 'updated' = 'updated',
+    order: 'asc' | 'desc' = 'desc'
+  ): Promise<GitHubRepository[]> {
+    try {
+      const octokit = new Octokit({
+        auth: accessToken,
+      });
+
+      const { data } = await octokit.rest.search.repos({
+        q: `${query} in:name user:@me`,
+        sort,
+        order,
         per_page: 100,
       });
 
-      return response.data;
-    } catch (error: any) {
-      throw new AppError(
-        400,
-        "GITHUB_ERROR",
-        `Failed to fetch branches: ${error.message}`
-      );
+      return data.items as GitHubRepository[];
+    } catch (error) {
+      logger.error('Failed to search repositories:', error);
+      throw new Error('Failed to search repositories');
     }
-  },
+  }
 
-  // Get repository issues
-  async getIssues(
-    owner: string,
-    repo: string,
-    accessToken: string,
-    page: number = 1
-  ): Promise<any[]> {
+  public async validateToken(accessToken: string): Promise<boolean> {
     try {
-      const octokit = this.getOctokit(accessToken);
-
-      const response = await octokit.rest.issues.listForRepo({
-        owner,
-        repo,
-        state: "open",
-        page,
-        per_page: 20,
+      const octokit = new Octokit({
+        auth: accessToken,
       });
 
-      return response.data;
-    } catch (error: any) {
-      throw new AppError(
-        400,
-        "GITHUB_ERROR",
-        `Failed to fetch issues: ${error.message}`
-      );
+      await octokit.rest.users.getAuthenticated();
+      return true;
+    } catch (error) {
+      return false;
     }
-  },
+  }
 
-  // Get pull requests
-  async getPullRequests(
-    owner: string,
-    repo: string,
-    accessToken: string,
-    page: number = 1
-  ): Promise<any[]> {
+  public async refreshToken(_refreshToken: string): Promise<{ access_token: string }> {
+    // GitHub doesn't support token refresh via OAuth
+    // Users need to re-authenticate
+    throw new Error('GitHub tokens cannot be refreshed. Please re-authenticate.');
+  }
+
+  public async revokeToken(accessToken: string): Promise<void> {
     try {
-      const octokit = this.getOctokit(accessToken);
-
-      const response = await octokit.rest.pulls.list({
-        owner,
-        repo,
-        state: "open",
-        page,
-        per_page: 20,
+      await axios.delete('https://api.github.com/applications/grants/' + accessToken, {
+        auth: {
+          username: this.clientId,
+          password: this.clientSecret,
+        },
       });
-
-      return response.data;
-    } catch (error: any) {
-      throw new AppError(
-        400,
-        "GITHUB_ERROR",
-        `Failed to fetch pull requests: ${error.message}`
-      );
+    } catch (error) {
+      logger.error('Failed to revoke GitHub token:', error);
+      // Don't throw error, just log it
     }
-  },
-
-  // Get repository info
-  async getRepositoryInfo(
-    owner: string,
-    repo: string,
-    accessToken: string
-  ): Promise<any> {
-    try {
-      const octokit = this.getOctokit(accessToken);
-
-      const response = await octokit.rest.repos.get({
-        owner,
-        repo,
-      });
-
-      return response.data;
-    } catch (error: any) {
-      throw new AppError(
-        400,
-        "GITHUB_ERROR",
-        `Failed to fetch repository info: ${error.message}`
-      );
-    }
-  },
-
-  // Link note to repository
-  async linkNoteToRepository(
-    noteId: string,
-    repositoryId: string,
-    userId: string
-  ): Promise<void> {
-    // Verify note ownership
-    const note = await prisma.note.findUnique({
-      where: { id: noteId },
-    });
-
-    if (!note || note.userId !== userId) {
-      throw new AppError(403, "FORBIDDEN", "Access denied");
-    }
-
-    // Verify repository exists
-    const repo = await prisma.repository.findUnique({
-      where: { id: repositoryId },
-    });
-
-    if (!repo || repo.workspaceId !== note.workspaceId) {
-      throw new AppError(
-        400,
-        "INVALID_REPO",
-        "Repository not in same workspace"
-      );
-    }
-
-    // Check if already linked
-    const existingLink = await prisma.noteRepository.findUnique({
-      where: {
-        noteId_repositoryId: { noteId, repositoryId },
-      },
-    });
-
-    if (existingLink) {
-      throw new AppError(400, "ALREADY_LINKED", "Note already linked to repository");
-    }
-
-    await prisma.noteRepository.create({
-      data: {
-        noteId,
-        repositoryId,
-      },
-    });
-  },
-
-  // Unlink note from repository
-  async unlinkNoteFromRepository(
-    noteId: string,
-    repositoryId: string,
-    userId: string
-  ): Promise<void> {
-    // Verify note ownership
-    const note = await prisma.note.findUnique({
-      where: { id: noteId },
-    });
-
-    if (!note || note.userId !== userId) {
-      throw new AppError(403, "FORBIDDEN", "Access denied");
-    }
-
-    await prisma.noteRepository.delete({
-      where: {
-        noteId_repositoryId: { noteId, repositoryId },
-      },
-    });
-  },
-
-  // Helper function
-  private formatRepository(repo: any): Repository {
-    return {
-      id: repo.id,
-      workspaceId: repo.workspaceId,
-      name: repo.name,
-      owner: repo.owner,
-      url: repo.url,
-      description: repo.description,
-      isPrivate: repo.isPrivate,
-      language: repo.language,
-      stars: repo.stars,
-      lastSyncedAt: repo.lastSyncedAt,
-      createdAt: repo.createdAt,
-    };
-  },
-};
+  }
+}

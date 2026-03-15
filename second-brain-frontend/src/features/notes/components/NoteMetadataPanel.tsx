@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNoteStore, MOCK_TEAM_MEMBERS } from '@/features/notes/store/useNoteStore';
+import { useNoteStore } from '@/features/notes/store/useNoteStore';
 import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
 import {
   Hash, Link2, GitCommit, ChevronDown, ChevronRight,
@@ -176,9 +176,8 @@ export const NoteMetadataPanel = ({ noteId, forceCollapse = 0 }: { noteId: strin
                 </div>
               </div>
 
-              {/* Team activity entries */}
               {noteActivity.map((act, i) => {
-                const author = MOCK_TEAM_MEMBERS.find(m => m.id === act.authorId);
+                const author = null; // No mock authors
                 return (
                   <div key={i} className="relative">
                     <span
@@ -187,12 +186,11 @@ export const NoteMetadataPanel = ({ noteId, forceCollapse = 0 }: { noteId: strin
                     />
                     <div>
                       <div className="flex items-center gap-1.5 mb-0.5">
-                        {isTeam && author && (
+                        {isTeam && (
                           <span
-                            className="text-[10px] font-bold"
-                            style={{ color: author.color }}
+                            className="text-[10px] font-bold text-primary"
                           >
-                            {author.name === 'You' ? 'You' : author.name.split(' ')[0]}
+                            User
                           </span>
                         )}
                         <span className="text-[10px] text-muted-foreground">{act.action}</span>

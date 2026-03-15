@@ -1,367 +1,226 @@
-// Note Service
-import { PrismaClient } from "@prisma/client";
-import {
-  Note,
-  NoteVersion,
-  CreateNoteInput,
-  UpdateNoteInput,
-  AppError,
-  PaginatedResponse,
-} from "../types";
+import { DatabaseConnection } from '@/database/DatabaseConnection';
+import { v4 as uuidv4 } from 'uuid';
+import { logger } from '@/utils/logger';
 
-const prisma = new PrismaClient();
+export interface Note {
+  id: string;
+  user_id: string;
+  project_id?: string;
+  title: string;
+  content: string;
+  content_type: 'markdown' | 'rich_text' | 'code';
+  metadata?: any;
+  is_public: boolean;
+  is_archived: boolean;
+  is_favorite: boolean;
+  word_count: number;
+  reading_time_minutes: number;
+  created_at?: Date;
+  updated_at?: Date;
+  tags?: string[]; // Tag IDs
+}
 
-export const noteService = {
-  // Create new note
-  async createNote(
-    workspaceId: string,
-    userId: string,
-    input: CreateNoteInput
-  ): Promise<Note> {
-    // Verify user is workspace member
-    const member = await prisma.workspaceMember.findUnique({
-      where: {
-        userId_workspaceId: { userId, workspaceId },
-      },
-    });
+export class NoteService {
+  constructor(private database: DatabaseConnection) {}
 
-    if (!member) {
-      throw new AppError(403, "FORBIDDEN", "Access denied");
+  async getNotes(userId: string, filters: any = {}): Promise<Note[]> {
+    let query = 'SELECT n.* FROM notes n WHERE n.user_id = ?';
+    const params: any[] = [userId];
+
+    if (filters.projectId) {
+      query += ' AND n.project_id = ?';
+      params.push(filters.projectId);
     }
 
-    const note = await prisma.note.create({
-      data: {
-        title: input.title,
-        content: input.content,
-        description: input.description,
-        workspaceId,
+    if (filters.isFavorite !== undefined) {
+      query += ' AND n.is_favorite = ?';
+      params.push(filters.isFavorite);
+    }
+
+    if (filters.isArchived !== undefined) {
+      query += ' AND n.is_archived = ?';
+      params.push(filters.isArchived);
+    }
+
+    if (filters.tagId) {
+      query += ' AND EXISTS (SELECT 1 FROM note_tags nt WHERE nt.note_id = n.id AND nt.tag_id = ?)';
+      params.push(filters.tagId);
+    }
+
+    query += ' ORDER BY n.updated_at DESC';
+    
+    const result = await this.database.query(query, params);
+    
+    // Fetch tags for each note
+    const notes = result.rows;
+    for (const note of notes) {
+      const tagsResult = await this.database.query(
+        'SELECT tag_id FROM note_tags WHERE note_id = ?',
+        [note.id]
+      );
+      note.tags = tagsResult.rows.map((row: any) => row.tag_id);
+    }
+
+    return notes;
+  }
+
+  async getNoteById(userId: string, noteId: string): Promise<Note | null> {
+    const query = 'SELECT * FROM notes WHERE user_id = ? AND id = ?';
+    const result = await this.database.query(query, [userId, noteId]);
+    
+    if (result.rows.length === 0) return null;
+    
+    const note = result.rows[0];
+    const tagsResult = await this.database.query(
+      'SELECT tag_id FROM note_tags WHERE note_id = ?',
+      [note.id]
+    );
+    note.tags = tagsResult.rows.map((row: any) => row.tag_id);
+    
+    return note;
+  }
+
+  async createNote(userId: string, data: Partial<Note>): Promise<Note> {
+    const id = uuidv4();
+    const {
+      project_id,
+      title,
+      content,
+      content_type,
+      metadata,
+      is_public,
+      is_archived,
+      is_favorite,
+      tags
+    } = data;
+
+    const word_count = content ? content.trim().split(/\s+/).length : 0;
+    const reading_time_minutes = Math.max(1, Math.ceil(word_count / 200));
+
+    await this.database.transaction(async (connection) => {
+      const query = `
+        INSERT INTO notes (
+          id, user_id, project_id, title, content, content_type, 
+          metadata, is_public, is_archived, is_favorite, 
+          word_count, reading_time_minutes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      await connection.execute(query, [
+        id,
         userId,
-        tags: input.tagIds
-          ? {
-              create: input.tagIds.map((tagId) => ({
-                tag: { connect: { id: tagId } },
-              })),
-            }
-          : undefined,
-      },
-      include: {
-        tags: { include: { tag: true } },
-        author: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            avatar: true,
-          },
-        },
-      },
-    });
+        project_id || null,
+        title || 'Untitled',
+        content || '',
+        content_type || 'markdown',
+        metadata ? JSON.stringify(metadata) : null,
+        is_public || false,
+        is_archived || false,
+        is_favorite || false,
+        word_count,
+        reading_time_minutes
+      ]);
 
-    // Create initial version
-    await prisma.noteVersion.create({
-      data: {
-        noteId: note.id,
-        content: input.content,
-        version: 1,
-      },
-    });
-
-    return this.formatNote(note);
-  },
-
-  // Get note by ID
-  async getNoteById(noteId: string, userId: string): Promise<Note> {
-    const note = await prisma.note.findUnique({
-      where: { id: noteId },
-      include: {
-        workspace: {
-          include: {
-            members: {
-              where: { userId },
-            },
-          },
-        },
-        tags: { include: { tag: true } },
-        author: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            avatar: true,
-          },
-        },
-      },
-    });
-
-    if (!note) {
-      throw new AppError(404, "NOTE_NOT_FOUND", "Note not found");
-    }
-
-    // Check access: user is workspace member or note is public
-    if (!note.isPublic && note.workspace.members.length === 0) {
-      throw new AppError(403, "FORBIDDEN", "Access denied");
-    }
-
-    return this.formatNote(note);
-  },
-
-  // Get all notes in workspace
-  async getWorkspaceNotes(
-    workspaceId: string,
-    userId: string,
-    page: number = 1,
-    pageSize: number = 20,
-    tagId?: string
-  ): Promise<PaginatedResponse<Note>> {
-    // Verify user is workspace member
-    const member = await prisma.workspaceMember.findUnique({
-      where: {
-        userId_workspaceId: { userId, workspaceId },
-      },
-    });
-
-    if (!member) {
-      throw new AppError(403, "FORBIDDEN", "Access denied");
-    }
-
-    const where: any = { workspaceId };
-
-    if (tagId) {
-      where.tags = {
-        some: { tagId },
-      };
-    }
-
-    const total = await prisma.note.count({ where });
-
-    const notes = await prisma.note.findMany({
-      where,
-      include: {
-        tags: { include: { tag: true } },
-        author: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            avatar: true,
-          },
-        },
-      },
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      orderBy: { updatedAt: "desc" },
-    });
-
-    return {
-      items: notes.map((note) => this.formatNote(note)),
-      total,
-      page,
-      pageSize,
-      totalPages: Math.ceil(total / pageSize),
-    };
-  },
-
-  // Update note
-  async updateNote(
-    noteId: string,
-    userId: string,
-    input: UpdateNoteInput
-  ): Promise<Note> {
-    const note = await prisma.note.findUnique({
-      where: { id: noteId },
-    });
-
-    if (!note) {
-      throw new AppError(404, "NOTE_NOT_FOUND", "Note not found");
-    }
-
-    // Verify ownership
-    if (note.userId !== userId) {
-      throw new AppError(403, "FORBIDDEN", "You can only edit your own notes");
-    }
-
-    // If content is changed, create new version
-    if (input.content && input.content !== note.content) {
-      const lastVersion = await prisma.noteVersion.findFirst({
-        where: { noteId },
-        orderBy: { version: "desc" },
-      });
-
-      const newVersion = (lastVersion?.version || 0) + 1;
-
-      await prisma.noteVersion.create({
-        data: {
-          noteId,
-          content: input.content,
-          version: newVersion,
-        },
-      });
-    }
-
-    // Update tags if provided
-    if (input.tagIds) {
-      await prisma.noteTag.deleteMany({ where: { noteId } });
-      if (input.tagIds.length > 0) {
-        await prisma.noteTag.createMany({
-          data: input.tagIds.map((tagId) => ({
-            noteId,
-            tagId,
-          })),
-        });
+      if (tags && tags.length > 0) {
+        for (const tagId of tags) {
+          await connection.execute(
+            'INSERT INTO note_tags (id, note_id, tag_id) VALUES (?, ?, ?)',
+            [uuidv4(), id, tagId]
+          );
+        }
       }
-    }
-
-    const updatedNote = await prisma.note.update({
-      where: { id: noteId },
-      data: {
-        title: input.title,
-        content: input.content,
-        description: input.description,
-        isPublic: input.isPublic,
-        isPinned: input.isPinned,
-      },
-      include: {
-        tags: { include: { tag: true } },
-        author: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            avatar: true,
-          },
-        },
-      },
     });
 
-    return this.formatNote(updatedNote);
-  },
+    const createdNote = await this.getNoteById(userId, id);
+    if (!createdNote) throw new Error('Failed to create note');
+    
+    return createdNote;
+  }
 
-  // Delete note
-  async deleteNote(noteId: string, userId: string): Promise<void> {
-    const note = await prisma.note.findUnique({
-      where: { id: noteId },
+  async updateNote(userId: string, noteId: string, data: Partial<Note>): Promise<Note> {
+    const {
+      project_id,
+      title,
+      content,
+      content_type,
+      metadata,
+      is_public,
+      is_archived,
+      is_favorite,
+      tags
+    } = data;
+
+    await this.database.transaction(async (connection) => {
+      const updates: string[] = [];
+      const params: any[] = [];
+
+      if (project_id !== undefined) {
+        updates.push('project_id = ?');
+        params.push(project_id);
+      }
+      if (title !== undefined) {
+        updates.push('title = ?');
+        params.push(title);
+      }
+      if (content !== undefined) {
+        updates.push('content = ?');
+        params.push(content);
+        const word_count = content.trim().split(/\s+/).length;
+        const reading_time_minutes = Math.max(1, Math.ceil(word_count / 200));
+        updates.push('word_count = ?', 'reading_time_minutes = ?');
+        params.push(word_count, reading_time_minutes);
+      }
+      if (content_type !== undefined) {
+        updates.push('content_type = ?');
+        params.push(content_type);
+      }
+      if (metadata !== undefined) {
+        updates.push('metadata = ?');
+        params.push(JSON.stringify(metadata));
+      }
+      if (is_public !== undefined) {
+        updates.push('is_public = ?');
+        params.push(is_public);
+      }
+      if (is_archived !== undefined) {
+        updates.push('is_archived = ?');
+        params.push(is_archived);
+      }
+      if (is_favorite !== undefined) {
+        updates.push('is_favorite = ?');
+        params.push(is_favorite);
+      }
+
+      if (updates.length > 0) {
+        params.push(userId, noteId);
+        const query = `UPDATE notes SET ${updates.join(', ')} WHERE user_id = ? AND id = ?`;
+        await connection.execute(query, params);
+      }
+
+      if (tags !== undefined) {
+        // Remove existing tags
+        await connection.execute('DELETE FROM note_tags WHERE note_id = ?', [noteId]);
+        
+        // Add new tags
+        if (tags.length > 0) {
+          for (const tagId of tags) {
+            await connection.execute(
+              'INSERT INTO note_tags (id, note_id, tag_id) VALUES (?, ?, ?)',
+              [uuidv4(), noteId, tagId]
+            );
+          }
+        }
+      }
     });
 
-    if (!note) {
-      throw new AppError(404, "NOTE_NOT_FOUND", "Note not found");
-    }
+    const updatedNote = await this.getNoteById(userId, noteId);
+    if (!updatedNote) throw new Error('Note not found after update');
+    
+    return updatedNote;
+  }
 
-    if (note.userId !== userId) {
-      throw new AppError(403, "FORBIDDEN", "You can only delete your own notes");
-    }
-
-    await prisma.note.delete({
-      where: { id: noteId },
-    });
-  },
-
-  // Get note versions
-  async getNoteVersions(noteId: string, userId: string): Promise<NoteVersion[]> {
-    const note = await prisma.note.findUnique({
-      where: { id: noteId },
-    });
-
-    if (!note) {
-      throw new AppError(404, "NOTE_NOT_FOUND", "Note not found");
-    }
-
-    // Verify access
-    const member = await prisma.workspaceMember.findUnique({
-      where: {
-        userId_workspaceId: { userId, workspaceId: note.workspaceId },
-      },
-    });
-
-    if (!member && !note.isPublic) {
-      throw new AppError(403, "FORBIDDEN", "Access denied");
-    }
-
-    const versions = await prisma.noteVersion.findMany({
-      where: { noteId },
-      orderBy: { version: "asc" },
-    });
-
-    return versions;
-  },
-
-  // Restore note to specific version
-  async restoreVersion(
-    noteId: string,
-    userId: string,
-    versionId: string
-  ): Promise<Note> {
-    const note = await prisma.note.findUnique({
-      where: { id: noteId },
-    });
-
-    if (!note) {
-      throw new AppError(404, "NOTE_NOT_FOUND", "Note not found");
-    }
-
-    if (note.userId !== userId) {
-      throw new AppError(403, "FORBIDDEN", "You can only restore your own notes");
-    }
-
-    const version = await prisma.noteVersion.findUnique({
-      where: { id: versionId },
-    });
-
-    if (!version || version.noteId !== noteId) {
-      throw new AppError(404, "VERSION_NOT_FOUND", "Version not found");
-    }
-
-    // Get last version number
-    const lastVersion = await prisma.noteVersion.findFirst({
-      where: { noteId },
-      orderBy: { version: "desc" },
-    });
-
-    const newVersionNumber = (lastVersion?.version || 0) + 1;
-
-    // Create new version with old content
-    await prisma.noteVersion.create({
-      data: {
-        noteId,
-        content: version.content,
-        version: newVersionNumber,
-      },
-    });
-
-    // Update note content
-    const updatedNote = await prisma.note.update({
-      where: { id: noteId },
-      data: { content: version.content },
-      include: {
-        tags: { include: { tag: true } },
-        author: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            avatar: true,
-          },
-        },
-      },
-    });
-
-    return this.formatNote(updatedNote);
-  },
-
-  // Helper function
-  private formatNote(note: any): Note {
-    return {
-      id: note.id,
-      workspaceId: note.workspaceId,
-      userId: note.userId,
-      title: note.title,
-      content: note.content,
-      description: note.description,
-      isPublic: note.isPublic,
-      isPinned: note.isPinned,
-      createdAt: note.createdAt,
-      updatedAt: note.updatedAt,
-      author: note.author,
-      tags: note.tags?.map((nt: any) => nt.tag),
-    };
-  },
-};
+  async deleteNote(userId: string, noteId: string): Promise<void> {
+    const query = 'DELETE FROM notes WHERE user_id = ? AND id = ?';
+    await this.database.query(query, [userId, noteId]);
+  }
+}

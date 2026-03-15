@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useNoteStore, MOCK_TEAM_MEMBERS } from '@/features/notes/store/useNoteStore';
+import { useNoteStore } from '@/features/notes/store/useNoteStore';
 import { useTagStore } from '@/features/tags/store/useTagStore';
 import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
 import {
@@ -184,14 +184,14 @@ export const NoteTree = ({ onSelectNote, selectedId }: NoteTreeProps) => {
           <div>
             <p className="px-3 py-1 text-[10px] font-bold text-muted-foreground/60 uppercase">Starred</p>
             {pinnedNotes.map(note => (
-              <NoteItem key={note.id} note={note} isActive={selectedId === note.id} onSelect={onSelectNote} activity={isTeam ? getLastActivity(note.id) : null} author={isTeam ? MOCK_TEAM_MEMBERS.find(m => m.id === note.userId) : null} isTeam={isTeam} />
+              <NoteItem key={note.id} note={note} isActive={selectedId === note.id} onSelect={onSelectNote} activity={isTeam ? getLastActivity(note.id) : null} author={null} isTeam={isTeam} />
             ))}
           </div>
         )}
         <div>
           <p className="px-3 py-1 text-[10px] font-bold text-muted-foreground/60 uppercase">{isTeam ? 'Shared' : 'Private'}</p>
           {otherNotes.map(note => (
-            <NoteItem key={note.id} note={note} isActive={selectedId === note.id} onSelect={onSelectNote} activity={isTeam ? getLastActivity(note.id) : null} author={isTeam ? MOCK_TEAM_MEMBERS.find(m => m.id === note.userId) : null} isTeam={isTeam} />
+            <NoteItem key={note.id} note={note} isActive={selectedId === note.id} onSelect={onSelectNote} activity={isTeam ? getLastActivity(note.id) : null} author={null} isTeam={isTeam} />
           ))}
         </div>
       </div>

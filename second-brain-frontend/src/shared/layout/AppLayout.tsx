@@ -5,12 +5,16 @@ import { CommandPalette } from './CommandPalette';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import WorkspaceChat from '@/features/chat/components/WorkspaceChat';
+import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
+import { useAuthStore } from '@/features/auth/store/useAuthStore';
 
 export const AppLayout = () => {
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const location = useLocation();
+  const fetchWorkspaces = useWorkspaceStore(state => state.fetchWorkspaces);
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
 
   // Close mobile sidebar on route change
   useEffect(() => {
@@ -29,6 +33,13 @@ export const AppLayout = () => {
     document.addEventListener('keydown', down);
     return () => document.removeEventListener('keydown', down);
   }, []);
+
+  // Fetch workspaces on mount if authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchWorkspaces();
+    }
+  }, [isAuthenticated, fetchWorkspaces]);
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden font-sans transition-colors selection:bg-primary/30">
