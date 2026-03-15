@@ -1,217 +1,92 @@
-// Tag Service
-import { PrismaClient } from "@prisma/client";
-import {
-  Tag,
-  CreateTagInput,
-  UpdateTagInput,
-  AppError,
-} from "../types";
+import { DatabaseConnection } from '@/database/DatabaseConnection';
+import { logger } from '@/utils/logger';
+import { v4 as uuidv4 } from 'uuid';
 
-const prisma = new PrismaClient();
+export interface Tag {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string;
+  description?: string;
+  created_at?: Date;
+}
 
-export const tagService = {
-  // Create new tag
-  async createTag(
-    workspaceId: string,
-    userId: string,
-    input: CreateTagInput
-  ): Promise<Tag> {
-    // Verify user is workspace member
-    const member = await prisma.workspaceMember.findUnique({
-      where: {
-        userId_workspaceId: { userId, workspaceId },
-      },
-    });
+export class TagService {
+  constructor(private database: DatabaseConnection) {}
 
-    if (!member) {
-      throw new AppError(403, "FORBIDDEN", "Access denied");
+  async getTags(userId: string): Promise<Tag[]> {
+    const query = 'SELECT * FROM tags WHERE user_id = ? ORDER BY name ASC';
+    const result = await this.database.query(query, [userId]);
+    return result.rows;
+  }
+
+  async getTagById(userId: string, tagId: string): Promise<Tag | null> {
+    const query = 'SELECT * FROM tags WHERE user_id = ? AND id = ?';
+    const result = await this.database.query(query, [userId, tagId]);
+    return result.rows.length > 0 ? result.rows[0] : null;
+  }
+
+  async createTag(userId: string, data: Partial<Tag>): Promise<Tag> {
+    const id = uuidv4();
+    const { name, color, description } = data;
+    
+    const query = `
+      INSERT INTO tags (id, user_id, name, color, description)
+      VALUES (?, ?, ?, ?, ?)
+    `;
+    
+    await this.database.query(query, [
+      id,
+      userId,
+      name,
+      color || '#6B7280',
+      description || null
+    ]);
+
+    const createdTag = await this.getTagById(userId, id);
+    if (!createdTag) throw new Error('Failed to create tag');
+    
+    return createdTag;
+  }
+
+  async updateTag(userId: string, tagId: string, data: Partial<Tag>): Promise<Tag> {
+    const { name, color, description } = data;
+    
+    const updates: string[] = [];
+    const params: any[] = [];
+
+    if (name !== undefined) {
+      updates.push('name = ?');
+      params.push(name);
+    }
+    if (color !== undefined) {
+      updates.push('color = ?');
+      params.push(color);
+    }
+    if (description !== undefined) {
+      updates.push('description = ?');
+      params.push(description);
     }
 
-    // Check if tag name already exists in workspace
-    const existingTag = await prisma.tag.findUnique({
-      where: {
-        workspaceId_name: { workspaceId, name: input.name },
-      },
-    });
-
-    if (existingTag) {
-      throw new AppError(400, "TAG_EXISTS", "Tag with this name already exists");
+    if (updates.length === 0) {
+      const existing = await this.getTagById(userId, tagId);
+      if (!existing) throw new Error('Tag not found');
+      return existing;
     }
 
-    const tag = await prisma.tag.create({
-      data: {
-        workspaceId,
-        name: input.name,
-        color: input.color || "#6366F1",
-        emoji: input.emoji,
-        description: input.description,
-      },
-    });
+    params.push(userId, tagId);
+    const query = `UPDATE tags SET ${updates.join(', ')} WHERE user_id = ? AND id = ?`;
+    
+    await this.database.query(query, params);
+    
+    const updatedTag = await this.getTagById(userId, tagId);
+    if (!updatedTag) throw new Error('Tag not found after update');
+    
+    return updatedTag;
+  }
 
-    return this.formatTag(tag);
-  },
-
-  // Get tag by ID
-  async getTagById(tagId: string, userId: string): Promise<Tag> {
-    const tag = await prisma.tag.findUnique({
-      where: { id: tagId },
-      include: {
-        workspace: {
-          include: {
-            members: {
-              where: { userId },
-            },
-          },
-        },
-      },
-    });
-
-    if (!tag || tag.workspace.members.length === 0) {
-      throw new AppError(404, "TAG_NOT_FOUND", "Tag not found");
-    }
-
-    return this.formatTag(tag);
-  },
-
-  // Get all tags in workspace
-  async getWorkspaceTags(workspaceId: string, userId: string): Promise<Tag[]> {
-    // Verify user is workspace member
-    const member = await prisma.workspaceMember.findUnique({
-      where: {
-        userId_workspaceId: { userId, workspaceId },
-      },
-    });
-
-    if (!member) {
-      throw new AppError(403, "FORBIDDEN", "Access denied");
-    }
-
-    const tags = await prisma.tag.findMany({
-      where: { workspaceId },
-      orderBy: { name: "asc" },
-    });
-
-    return tags.map((tag) => this.formatTag(tag));
-  },
-
-  // Update tag
-  async updateTag(
-    tagId: string,
-    userId: string,
-    input: UpdateTagInput
-  ): Promise<Tag> {
-    const tag = await prisma.tag.findUnique({
-      where: { id: tagId },
-      include: {
-        workspace: {
-          include: {
-            members: {
-              where: { userId, role: "owner" },
-            },
-          },
-        },
-      },
-    });
-
-    if (!tag) {
-      throw new AppError(404, "TAG_NOT_FOUND", "Tag not found");
-    }
-
-    // Only workspace owners/admins can update tags
-    const member = await prisma.workspaceMember.findUnique({
-      where: {
-        userId_workspaceId: { userId, workspaceId: tag.workspaceId },
-      },
-    });
-
-    if (!member || !["owner", "admin"].includes(member.role)) {
-      throw new AppError(
-        403,
-        "FORBIDDEN",
-        "Only workspace admins can modify tags"
-      );
-    }
-
-    // Check if new name conflicts
-    if (input.name && input.name !== tag.name) {
-      const existingTag = await prisma.tag.findUnique({
-        where: {
-          workspaceId_name: { workspaceId: tag.workspaceId, name: input.name },
-        },
-      });
-
-      if (existingTag) {
-        throw new AppError(400, "TAG_EXISTS", "Tag with this name already exists");
-      }
-    }
-
-    const updatedTag = await prisma.tag.update({
-      where: { id: tagId },
-      data: {
-        name: input.name,
-        color: input.color,
-        emoji: input.emoji,
-        description: input.description,
-      },
-    });
-
-    return this.formatTag(updatedTag);
-  },
-
-  // Delete tag
-  async deleteTag(tagId: string, userId: string): Promise<void> {
-    const tag = await prisma.tag.findUnique({
-      where: { id: tagId },
-      include: {
-        workspace: {
-          include: {
-            members: {
-              where: { userId },
-            },
-          },
-        },
-      },
-    });
-
-    if (!tag) {
-      throw new AppError(404, "TAG_NOT_FOUND", "Tag not found");
-    }
-
-    // Only workspace owners/admins can delete tags
-    const member = await prisma.workspaceMember.findUnique({
-      where: {
-        userId_workspaceId: { userId, workspaceId: tag.workspaceId },
-      },
-    });
-
-    if (!member || !["owner", "admin"].includes(member.role)) {
-      throw new AppError(
-        403,
-        "FORBIDDEN",
-        "Only workspace admins can delete tags"
-      );
-    }
-
-    // Delete tag and remove associations
-    await prisma.noteTag.deleteMany({
-      where: { tagId },
-    });
-
-    await prisma.tag.delete({
-      where: { id: tagId },
-    });
-  },
-
-  // Helper function
-  private formatTag(tag: any): Tag {
-    return {
-      id: tag.id,
-      workspaceId: tag.workspaceId,
-      name: tag.name,
-      color: tag.color,
-      emoji: tag.emoji,
-      description: tag.description,
-      createdAt: tag.createdAt,
-    };
-  },
-};
+  async deleteTag(userId: string, tagId: string): Promise<void> {
+    const query = 'DELETE FROM tags WHERE user_id = ? AND id = ?';
+    await this.database.query(query, [userId, tagId]);
+  }
+}

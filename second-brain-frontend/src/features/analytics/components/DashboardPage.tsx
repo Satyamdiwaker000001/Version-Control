@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { useNoteStore, MOCK_TEAM_MEMBERS, mockTeamActivity } from '@/features/notes/store/useNoteStore';
+import { useMemo, useEffect } from 'react';
+import { useNoteStore } from '@/features/notes/store/useNoteStore';
 import type { NoteState } from '@/features/notes/store/useNoteStore';
 import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
 import { useTagStore } from '@/features/tags/store/useTagStore';
@@ -29,21 +29,17 @@ const FadeIn = ({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
 );
 
 // ─── Author pill ──────────────────────────────────────────────────────────────
-const AuthorPill = ({ userId }: { userId: string }) => {
-  const member = MOCK_TEAM_MEMBERS.find(m => m.id === userId);
-  if (!member) return null;
+const AuthorPill = () => {
   return (
     <span
-      className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full"
-      style={{ backgroundColor: member.color + '18', color: member.color }}
+      className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary"
     >
       <span
-        className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] text-white font-bold"
-        style={{ backgroundColor: member.color }}
+        className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] text-white font-bold bg-primary"
       >
-        {member.initials[0]}
+        U
       </span>
-      {member.name}
+      User
     </span>
   );
 };
@@ -305,16 +301,6 @@ const TeamDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) 
 
   const connections = notes.reduce((acc, n) => acc + (n.backlinks?.length || 0), 0);
 
-  const actionVerb = (action: string) => {
-    if (action === 'created') return 'created';
-    if (action === 'edited') return 'edited';
-    if (action === 'pinned') return 'pinned';
-    return action;
-  };
-
-  const getNoteTitle = (noteId: string) => {
-    return notes.find(n => n.id === noteId)?.title || 'Untitled';
-  };
 
   return (
     <div className="space-y-8 pb-12">
@@ -332,20 +318,8 @@ const TeamDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) 
               <p className="text-sm text-muted-foreground">
                 Collaborative knowledge base
               </p>
-              <div className="flex -space-x-2">
-                {MOCK_TEAM_MEMBERS.map(m => (
-                  <div
-                    key={m.id}
-                    title={m.name}
-                    className="w-6 h-6 rounded-full border-2 border-background flex items-center justify-center text-[9px] font-bold text-white shrink-0"
-                    style={{ backgroundColor: m.color }}
-                  >
-                    {m.initials[0]}
-                  </div>
-                ))}
-              </div>
               <span className="text-[11px] font-medium text-muted-foreground">
-                {MOCK_TEAM_MEMBERS.length} members
+                1 member
               </span>
             </div>
           </div>
@@ -387,7 +361,7 @@ const TeamDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) 
             { label: 'Shared Notes', value: notes.length, icon: FileText, color: 'text-blue-500', bg: 'bg-blue-500/10' },
             { label: 'Connections', value: connections, icon: Network, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
             { label: 'Active Tags', value: 5, icon: Hash, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-            { label: 'Members', value: MOCK_TEAM_MEMBERS.length, icon: UserCheck, color: 'text-violet-500', bg: 'bg-violet-500/10' },
+            { label: 'Members', value: 1, icon: UserCheck, color: 'text-violet-500', bg: 'bg-violet-500/10' },
           ].map((stat, i) => (
             <Card key={i} className="hover:border-primary/30 transition-all cursor-default group">
               <CardContent className="p-5 flex items-center justify-between">
@@ -461,7 +435,6 @@ const TeamDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) 
               <Card className="overflow-hidden">
                 <div className="divide-y divide-border">
                   {recentNotes.map(note => {
-                    const author = MOCK_TEAM_MEMBERS.find(m => m.id === note.userId);
                     return (
                       <div
                         key={note.id}
@@ -470,17 +443,15 @@ const TeamDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) 
                       >
                         {/* Author avatar */}
                         <div
-                          className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-                          style={{ backgroundColor: author?.color || '#8b5cf6' }}
-                          title={author?.name}
+                          className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 bg-primary"
                         >
-                          {author?.initials || 'U'}
+                          U
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold group-hover:text-primary transition-colors truncate">{note.title}</p>
                           <p className="text-[11px] text-muted-foreground mt-0.5">
-                            <span className="font-medium" style={{ color: author?.color }}>
-                              {author?.name}
+                            <span className="font-medium text-primary">
+                              User
                             </span>
                             {' '}· {formatDistanceToNow(new Date(note.updatedAt), { addSuffix: true })}
                           </p>
@@ -508,42 +479,9 @@ const TeamDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) 
                 <Activity size={18} className="text-primary" /> Team Activity
               </h2>
               <Card className="overflow-hidden">
-                <div className="px-5 pt-5 pb-3 relative before:absolute before:left-[28px] before:top-10 before:bottom-4 before:w-px before:bg-border space-y-5">
-                  {mockTeamActivity.map((item, i) => {
-                    const member = MOCK_TEAM_MEMBERS.find(m => m.id === item.authorId);
-                    return (
-                      <div key={i} className="flex gap-4 relative">
-                        <div
-                          className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold text-white border-2 border-background z-10"
-                          style={{ backgroundColor: member?.color || '#8b5cf6' }}
-                        >
-                          {member?.initials || 'U'}
-                        </div>
-                        <div className="flex-1 min-w-0 pt-0.5">
-                          <p className="text-sm leading-relaxed">
-                            <span className="font-bold" style={{ color: member?.color }}>
-                              {member?.name}
-                            </span>
-                            <span className="text-muted-foreground"> {actionVerb(item.action)} </span>
-                            <span
-                              className="font-semibold text-foreground/90 cursor-pointer hover:text-primary transition-colors"
-                              onClick={() => navigate(`/editor?noteId=${item.noteId}`)}
-                            >
-                              {getNoteTitle(item.noteId)}
-                            </span>
-                          </p>
-                          {item.commitMessage && (
-                            <p className="text-[11px] text-muted-foreground mt-0.5 italic truncate">
-                              "{item.commitMessage}"
-                            </p>
-                          )}
-                          <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-wider mt-1">
-                            {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="px-5 py-10 flex flex-col items-center justify-center text-muted-foreground/40 gap-3">
+                  <Activity size={32} />
+                  <p className="text-sm">No recent team activity</p>
                 </div>
               </Card>
             </div>
@@ -554,32 +492,24 @@ const TeamDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) 
             <Card>
               <CardHeader className="p-5 pb-3">
                 <CardTitle className="text-sm font-bold flex items-center gap-2">
-                  <Users size={15} className="text-primary" /> Team Members
+                  <Users size={15} className="text-primary" /> Active Members
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-5 pb-4 space-y-3">
-                {MOCK_TEAM_MEMBERS.map(m => (
-                  <div key={m.id} className="flex items-center gap-3">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-                      style={{ backgroundColor: m.color }}
-                    >
-                      {m.initials[0]}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{m.name}</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {m.id === 'u1' ? 'Owner' : 'Contributor'}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                      </span>
-                    </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white bg-primary">
+                    Y
                   </div>
-                ))}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">You</p>
+                    <p className="text-[10px] text-muted-foreground">Owner</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="relative flex h-2 w-2">
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                    </span>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </FadeIn>
@@ -595,8 +525,15 @@ const TeamDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) 
 export const DashboardPage = () => {
   const allNotes = useNoteStore((state: NoteState) => state.notes);
   const { workspaces, activeWorkspace: storeActive } = useWorkspaceStore();
+  const fetchNotes = useNoteStore((state: NoteState) => state.fetchNotes);
   const activeWorkspace = storeActive || workspaces[0];
   const isTeam = activeWorkspace?.type === 'team';
+
+  useEffect(() => {
+    if (activeWorkspace?.id) {
+      fetchNotes(activeWorkspace.id);
+    }
+  }, [activeWorkspace?.id, fetchNotes]);
 
   const notes = useMemo(
     () => allNotes.filter(n => n.workspaceId === activeWorkspace?.id),

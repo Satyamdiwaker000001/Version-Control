@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useNavigate } from 'react-router-dom';
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Github, Shield, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { authService } from '@/features/auth/services/authService';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
@@ -21,10 +21,33 @@ export const LoginPage = () => {
   const navigate = useNavigate();
   const setAuth = useAuthStore((state: AuthState) => state.setAuth);
   const [showPassword, setShowPassword] = useState(false);
+  const [isSocialLoading, setIsSocialLoading] = useState<string | null>(null);
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
   });
+
+  const handleSocialLogin = async (provider: string) => {
+    setIsSocialLoading(provider);
+    try {
+      // Mock social login for now - will integrate with backend
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      const mockUser = {
+        id: `social_${Date.now()}`,
+        email: `user@${provider}.com`,
+        name: `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`,
+        createdAt: new Date().toISOString(),
+      };
+      const token = btoa(JSON.stringify({ userId: mockUser.id, email: mockUser.email, provider }));
+      setAuth(mockUser, token);
+      toast.success(`Successfully connected with ${provider.charAt(0).toUpperCase() + provider.slice(1)}`);
+      navigate('/');
+    } catch (error) {
+      toast.error(`Failed to connect with ${provider}`);
+    } finally {
+      setIsSocialLoading(null);
+    }
+  };
 
   const onSubmit = async (data: LoginFormValues) => {
     try {
@@ -50,6 +73,27 @@ export const LoginPage = () => {
         </div>
 
         <div className="mt-8">
+          {/* Social Login Options */}
+          <div className="grid grid-cols-1 gap-3">
+            <button
+              type="button"
+              onClick={() => handleSocialLogin('github')}
+              className="flex w-full justify-center items-center gap-3 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all shadow-sm"
+            >
+              <Github className="w-5 h-5" />
+              Continue with GitHub
+            </button>
+          </div>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-zinc-300 dark:border-zinc-700"></div>
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-4 bg-white dark:bg-zinc-950 text-zinc-500 dark:text-zinc-400">Or continue with email</span>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div>
               <label className="block text-sm font-medium leading-6 text-zinc-900 dark:text-zinc-200">
@@ -120,9 +164,15 @@ export const LoginPage = () => {
           <p className="mt-6 text-center text-sm text-zinc-500 dark:text-zinc-400">
             Not a member?{' '}
             <Link to="/register" className="font-semibold leading-6 text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
-              Start a 14 day free trial
+              Start your free trial
             </Link>
           </p>
+
+          {/* Security Badge */}
+          <div className="mt-8 flex items-center justify-center gap-2 text-xs text-zinc-400">
+            <Shield className="w-4 h-4" />
+            <span>Secured with industry-standard encryption</span>
+          </div>
         </div>
       </div>
     </div>

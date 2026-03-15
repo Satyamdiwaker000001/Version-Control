@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/shared/ui/Button';
-import { MOCK_TEAM_MEMBERS } from '@/features/notes/store/useNoteStore';
 import { MessageSquare, X, Minimize2, Maximize2 } from 'lucide-react';
 
 interface Comment {
@@ -114,7 +113,7 @@ export const FileCommentSection = ({
               ) : (
                 comments.map(comment => (
                   <div key={comment.id} className="flex items-start space-x-3">
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center font-bold text-sm shrink-0" style={{ backgroundColor: MOCK_TEAM_MEMBERS.find(m => m.id === comment.author.id)?.color + '30', color: MOCK_TEAM_MEMBERS.find(m => m.id === comment.author.id)?.color }}>
+                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center font-bold text-sm shrink-0 text-white">
                       {comment.author.name.charAt(0)}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -143,11 +142,7 @@ export const FileCommentSection = ({
                 />
                 {showSuggestions && (
                   <div ref={suggestionsRef} className="absolute bottom-full left-0 mb-2 w-full bg-card border rounded-md shadow-lg z-10 max-h-32 overflow-y-auto">
-                    {MOCK_TEAM_MEMBERS.map(member => (
-                      <div key={member.id} onClick={() => handleMentionClick(member.name)} className="p-2 hover:bg-accent cursor-pointer">
-                        {member.name}
-                      </div>
-                    ))}
+                    <div className="p-2 text-xs italic text-muted-foreground">No members to mention</div>
                   </div>
                 )}
               </div>
@@ -192,7 +187,7 @@ export const FileCommentSection = ({
         ) : (
           comments.slice(0, 3).map(comment => (
             <div key={comment.id} className="flex items-start space-x-2">
-              <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center font-bold text-xs shrink-0" style={{ backgroundColor: MOCK_TEAM_MEMBERS.find(m => m.id === comment.author.id)?.color + '30', color: MOCK_TEAM_MEMBERS.find(m => m.id === comment.author.id)?.color }}>
+              <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center font-bold text-xs shrink-0 text-white">
                 {comment.author.name.charAt(0)}
               </div>
               <div className="flex-1 min-w-0">
@@ -228,13 +223,9 @@ export const FileCommentSection = ({
             rows={2}
           />
           {showSuggestions && (
-            <div ref={suggestionsRef} className="absolute bottom-full left-0 mb-2 w-full bg-card border rounded-md shadow-lg z-10 max-h-32 overflow-y-auto">
-              {MOCK_TEAM_MEMBERS.map(member => (
-                <div key={member.id} onClick={() => handleMentionClick(member.name)} className="p-2 hover:bg-accent cursor-pointer">
-                  {member.name}
-                </div>
-              ))}
-            </div>
+              <div ref={suggestionsRef} className="absolute bottom-full left-0 mb-2 w-full bg-card border rounded-md shadow-lg z-10 max-h-32 overflow-y-auto">
+                <div className="p-2 text-xs italic text-muted-foreground">No members to mention</div>
+              </div>
           )}
         </div>
         <div className="mt-1 flex justify-end">
