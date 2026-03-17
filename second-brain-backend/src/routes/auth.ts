@@ -37,7 +37,7 @@ router.post('/register', asyncHandler(async (req: Request, res: Response) => {
     throw createError(error.details[0]?.message || 'Validation failed', 400);
   }
 
-  const { user, tokens } = await authService.register(value);
+  const { user, tokens, token } = await authService.register(value);
 
   res.status(201).json({
     success: true,
@@ -51,6 +51,7 @@ router.post('/register', asyncHandler(async (req: Request, res: Response) => {
         created_at: user.created_at,
       },
       tokens,
+      token,
     },
     message: 'User registered successfully',
   });
@@ -63,7 +64,7 @@ router.post('/login', asyncHandler(async (req: Request, res: Response) => {
     throw createError(error.details[0]?.message || 'Validation failed', 400);
   }
 
-  const { user, tokens } = await authService.login(value);
+  const { user, tokens, token } = await authService.login(value);
 
   res.json({
     success: true,
@@ -77,6 +78,7 @@ router.post('/login', asyncHandler(async (req: Request, res: Response) => {
         last_login_at: user.last_login_at,
       },
       tokens,
+      token,
     },
     message: 'Login successful',
   });

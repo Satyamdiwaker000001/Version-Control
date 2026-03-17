@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useNoteStore } from '@/features/notes/store/useNoteStore';
 import { useTagStore } from '@/features/tags/store/useTagStore';
 import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
+import { useProjectStore } from '@/features/projects/store/useProjectStore';
 import {
   FileText, Plus, Search,
   ArrowDownAZ, Calendar, MoreHorizontal,
@@ -160,9 +161,14 @@ export const NoteTree = ({ onSelectNote, selectedId }: NoteTreeProps) => {
             </button>
             <button 
               onClick={() => {
+                const activeProjectId = useProjectStore.getState().activeProjectId;
+                if (!activeProjectId) {
+                  toast.error('Please create or select a project first');
+                  return;
+                }
                 const id = `n${Date.now()}`;
                 useNoteStore.getState().createNote({
-                  title: 'Untitled Note', content: '', tags: [], workspaceId: activeWorkspace?.id || 'ws1', userId: 'u1', backlinks: [], isPinned: false
+                  title: 'Untitled Note', content: '', tags: [], workspaceId: activeProjectId
                 });
                 onSelectNote(id);
               }}
@@ -180,20 +186,36 @@ export const NoteTree = ({ onSelectNote, selectedId }: NoteTreeProps) => {
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 pb-4 space-y-4">
-        {pinnedNotes.length > 0 && (
-          <div>
-            <p className="px-3 py-1 text-[10px] font-bold text-muted-foreground/60 uppercase">Starred</p>
-            {pinnedNotes.map(note => (
-              <NoteItem key={note.id} note={note} isActive={selectedId === note.id} onSelect={onSelectNote} activity={isTeam ? getLastActivity(note.id) : null} author={null} isTeam={isTeam} />
-            ))}
+        {allNotes.filter(n => n.workspaceId === activeWorkspace?.id).length === 0 ? (
+          <div className="px-3 py-10 text-center">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              No active knowledge. Start by creating a note or linking a repository.
+            </p>
           </div>
+        ) : filteredNotes.length === 0 ? (
+          <div className="px-3 py-10 text-center">
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              No matches found. Try broadening your keywords.
+            </p>
+          </div>
+        ) : (
+          <>
+            {pinnedNotes.length > 0 && (
+              <div>
+                <p className="px-3 py-1 text-[10px] font-bold text-muted-foreground/60 uppercase">Starred</p>
+                {pinnedNotes.map(note => (
+                  <NoteItem key={note.id} note={note} isActive={selectedId === note.id} onSelect={onSelectNote} activity={isTeam ? getLastActivity(note.id) : null} author={null} isTeam={isTeam} />
+                ))}
+              </div>
+            )}
+            <div>
+              <p className="px-3 py-1 text-[10px] font-bold text-muted-foreground/60 uppercase">{isTeam ? 'Shared' : 'Private'}</p>
+              {otherNotes.map(note => (
+                <NoteItem key={note.id} note={note} isActive={selectedId === note.id} onSelect={onSelectNote} activity={isTeam ? getLastActivity(note.id) : null} author={null} isTeam={isTeam} />
+              ))}
+            </div>
+          </>
         )}
-        <div>
-          <p className="px-3 py-1 text-[10px] font-bold text-muted-foreground/60 uppercase">{isTeam ? 'Shared' : 'Private'}</p>
-          {otherNotes.map(note => (
-            <NoteItem key={note.id} note={note} isActive={selectedId === note.id} onSelect={onSelectNote} activity={isTeam ? getLastActivity(note.id) : null} author={null} isTeam={isTeam} />
-          ))}
-        </div>
       </div>
     </div>
   );

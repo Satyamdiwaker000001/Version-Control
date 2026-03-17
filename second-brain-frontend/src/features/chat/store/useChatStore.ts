@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { User } from '@/shared/types';
-import { useAuthStore } from '@/features/auth/store/useAuthStore';
+import apiClient from '@/shared/api/apiClient';
 
 export interface Channel {
   id: string;
@@ -23,67 +23,113 @@ interface ChatState {
   messages: ChatMessage[];
   activeChannelId: string | null;
   isChatOpen: boolean;
+  isLoading: boolean;
+  
   setChatOpen: (isOpen: boolean) => void;
   setActiveChannel: (channelId: string) => void;
-  sendMessage: (workspaceId: string, channelId: string, content: string) => void;
-  createChannel: (workspaceId: string, name: string, description?: string) => void;
+  fetchChannels: (workspaceId: string) => Promise<void>;
+  fetchMessages: (channelId: string) => Promise<void>;
+  sendMessage: (workspaceId: string, channelId: string, content: string) => Promise<void>;
+  createChannel: (workspaceId: string, name: string, description?: string) => Promise<void>;
 }
 
-// Initial mock data
-const MOCK_CHANNELS: Channel[] = [
-  { id: 'c1', workspaceId: 'ws1', name: 'general', description: 'General discussion' },
-  { id: 'c2', workspaceId: 'ws1', name: 'research', description: 'Notes and research talk' },
-  { id: 'c3', workspaceId: 'ws2', name: 'project-x', description: 'Engineering team' }
-];
-
-const INITIAL_MESSAGES: ChatMessage[] = [
-  {
-    id: 'm1',
-    channelId: 'c3',
-    workspaceId: 'ws2',
-    user: { id: 'u2', email: 'sarah@example.com', name: 'Sarah', createdAt: new Date().toISOString() },
-    content: 'Hey everyone, I just updated the architecture document for the new API.',
-    timestamp: new Date(Date.now() - 3600000).toISOString()
-  },
-  {
-    id: 'm2',
-    channelId: 'c3',
-    workspaceId: 'ws2',
-    user: { id: 'u1', email: 'alex@example.com', name: 'Alex', createdAt: new Date().toISOString() },
-    content: 'Thanks Sarah! I will read it over now. Did you include the D3 graph updates?',
-    timestamp: new Date(Date.now() - 1800000).toISOString()
-  }
-];
-
-export const useChatStore = create<ChatState>((set) => ({
-  channels: MOCK_CHANNELS,
-  messages: INITIAL_MESSAGES,
+export const useChatStore = create<ChatState>((set, get) => ({
+  channels: [],
+  messages: [],
   activeChannelId: null,
   isChatOpen: false,
+  isLoading: false,
+
   setChatOpen: (isOpen) => set({ isChatOpen: isOpen }),
-  setActiveChannel: (channelId) => set({ activeChannelId: channelId }),
-  sendMessage: (workspaceId, channelId, content) => {
-    const user = useAuthStore.getState().user;
-    if (!user) return;
-    
-    const newMessage: ChatMessage = {
-      id: `m_${Date.now()}`,
-      workspaceId,
-      channelId,
-      user,
-      content,
-      timestamp: new Date().toISOString()
-    };
-    
-    set((state) => ({ messages: [...state.messages, newMessage] }));
+  
+  setActiveChannel: (channelId) => {
+    set({ activeChannelId: channelId });
+    if (channelId) {
+      get().fetchMessages(channelId);
+    }
   },
-  createChannel: (workspaceId, name, description) => {
-    const newChannel: Channel = {
-      id: `c_${Date.now()}`,
-      workspaceId,
-      name,
-      description
-    };
-    set((state) => ({ channels: [...state.channels, newChannel], activeChannelId: newChannel.id }));
+
+  fetchChannels: async (workspaceId) => {
+    set({ isLoading: true });
+    try {
+      const res = await apiClient.get('/chats', { params: { workspaceId } });
+      if (res.data.success) {
+        const mapped = res.data.data.map((c: any) => ({
+          id: c.id,
+          workspaceId: c.workspace_id,
+          name: c.name,
+          description: c.description
+        }));
+        set({ channels: mapped });
+        if (mapped.length > 0 && !get().activeChannelId) {
+          get().setActiveChannel(mapped[0].id);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch channels:', error);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  fetchMessages: async (channelId) => {
+    try {
+      const res = await apiClient.get(`/chats/${channelId}`);
+      if (res.data.success) {
+        const mapped = res.data.data.map((m: any) => ({
+          id: m.id,
+          channelId: m.channel_id,
+          workspaceId: '', // Would need to fetch from channel
+          user: m.user || { id: m.user_id, name: 'User', email: '' },
+          content: m.content,
+          timestamp: m.created_at
+        }));
+        set({ messages: mapped });
+      }
+    } catch (error) {
+      console.error('Failed to fetch messages:', error);
+    }
+  },
+
+  sendMessage: async (workspaceId, channelId, content) => {
+    try {
+      const res = await apiClient.post(`/chats/${channelId}/messages`, { content });
+      if (res.data.success) {
+        const m = res.data.data;
+        const newMessage: ChatMessage = {
+          id: m.id,
+          workspaceId,
+          channelId,
+          user: m.user || { id: m.user_id, name: 'You', email: '' },
+          content: m.content,
+          timestamp: m.created_at
+        };
+        set((state) => ({ messages: [...state.messages, newMessage] }));
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    }
+  },
+
+  createChannel: async (workspaceId, name, description) => {
+    try {
+      const res = await apiClient.post('/chats', { workspaceId, name, description });
+      if (res.data.success) {
+        const c = res.data.data;
+        const newChannel: Channel = {
+          id: c.id,
+          workspaceId: c.workspace_id,
+          name: c.name,
+          description: c.description
+        };
+        set((state) => ({ 
+          channels: [...state.channels, newChannel],
+          activeChannelId: newChannel.id
+        }));
+        get().setActiveChannel(newChannel.id);
+      }
+    } catch (error) {
+      console.error('Failed to create channel:', error);
+    }
   }
 }));

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import Joi from 'joi';
 import { GitHubService } from '@/services/GitHubService';
 import { AuthService } from '@/services/AuthService';
@@ -45,11 +46,24 @@ router.get('/auth/callback', asyncHandler(async (req: Request, res: Response) =>
     // Authenticate or register user
     const { user, tokens, isNewUser } = await authService.loginWithGitHub(githubUser);
     
-    // Store GitHub access token
-    await database.query(
-      'UPDATE users SET github_access_token = ? WHERE id = ?',
-      [tokenData.access_token, user.id]
-    );
+    // Store GitHub access token in user_integrations table
+    await database.query(`
+      INSERT INTO user_integrations (id, user_id, provider, provider_user_id, username, access_token, profile_url)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE 
+        access_token = VALUES(access_token),
+        username = VALUES(username),
+        profile_url = VALUES(profile_url),
+        updated_at = CURRENT_TIMESTAMP
+    `, [
+      uuidv4(),
+      user.id,
+      'github',
+      githubUser.id.toString(),
+      githubUser.login,
+      tokenData.access_token,
+      githubUser.html_url
+    ]);
 
     // Redirect to frontend with tokens
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
@@ -63,24 +77,68 @@ router.get('/auth/callback', asyncHandler(async (req: Request, res: Response) =>
   }
 }));
 
-// Get user's GitHub repositories
-router.get('/repositories', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
-  // Get user's GitHub access token
-  const userResult = await database.query(
-    'SELECT github_access_token FROM users WHERE id = ?',
-    [req.user.id]
+// Get GitHub user profile
+router.get('/profile', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const result = await database.query(
+    'SELECT access_token FROM user_integrations WHERE user_id = ? AND provider = ?',
+    [req.user!.id, 'github']
   );
   
-  if (!userResult.rows[0]?.github_access_token) {
+  if (result.rows.length === 0) {
     throw createError('GitHub account not connected', 400);
   }
 
-  const repositories = await githubService.getUserRepositories(userResult.rows[0].github_access_token);
+  const profile = await githubService.getUserInfo(result.rows[0].access_token);
   
   res.json({
     success: true,
-    data: { repositories },
+    data: profile,
+    message: 'GitHub profile fetched successfully',
+  });
+}));
+
+// Get user's GitHub repositories
+router.get('/repositories', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const result = await database.query(
+    'SELECT access_token FROM user_integrations WHERE user_id = ? AND provider = ?',
+    [req.user!.id, 'github']
+  );
+  
+  if (result.rows.length === 0) {
+    throw createError('GitHub account not connected', 400);
+  }
+
+  const repositories = await githubService.getUserRepositories(result.rows[0].access_token);
+  
+  res.json({
+    success: true,
+    data: repositories,
     message: 'GitHub repositories fetched successfully',
+  });
+}));
+
+// Get repository commits
+router.get('/commits/:owner/:repo', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const { owner, repo } = req.params;
+  const result = await database.query(
+    'SELECT access_token FROM user_integrations WHERE user_id = ? AND provider = ?',
+    [req.user!.id, 'github']
+  );
+  
+  if (result.rows.length === 0) {
+    throw createError('GitHub account not connected', 400);
+  }
+
+  if (!owner || !repo) {
+    throw createError('Owner and repository name are required', 400);
+  }
+
+  const commits = await githubService.getRepositoryCommits(result.rows[0].access_token, owner, repo);
+  
+  res.json({
+    success: true,
+    data: commits,
+    message: 'GitHub commits fetched successfully',
   });
 }));
 

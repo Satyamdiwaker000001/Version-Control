@@ -6,11 +6,14 @@ import {
   Hash, 
   Share2,
   Kanban,
+  MessageSquare,
   PanelLeft,
   PanelLeftClose
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/shared/utils/cn';
+import { useProjectStore } from '@/features/projects/store/useProjectStore';
+import { Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const NAV_SECTIONS = [
@@ -22,6 +25,7 @@ const NAV_SECTIONS = [
       { name: 'Tags', path: '/tags', icon: Hash },
       { name: 'Knowledge Graph', path: '/graph', icon: Share2 },
       { name: 'Projects', path: '/projects', icon: Kanban },
+      { name: 'Chat', path: '/chat', icon: MessageSquare },
     ],
   },
   {
@@ -120,6 +124,46 @@ export const Sidebar = ({
           </div>
         ))}
       </nav>
+
+      {/* Projects Section */}
+      {!isCollapsed && (
+        <div className="px-6 pb-8 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">Projects</p>
+            <button className="p-1 hover:text-primary transition-colors hover:bg-accent rounded">
+              <Plus size={12} />
+            </button>
+          </div>
+          <ProjectList />
+        </div>
+      )}
     </aside>
+  );
+};
+
+const ProjectList = () => {
+  const { projects, activeProjectId, setActiveProject } = useProjectStore();
+  
+  return (
+    <div className="space-y-1">
+      {projects.map(project => (
+        <div
+          key={project.id}
+          onClick={() => setActiveProject(project.id)}
+          className={cn(
+            "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-all",
+            activeProjectId === project.id 
+              ? "bg-primary/10 text-primary border-l-2 border-primary" 
+              : "text-muted-foreground hover:bg-accent hover:text-foreground"
+          )}
+        >
+          <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+          <span className="truncate">{project.name}</span>
+        </div>
+      ))}
+      {projects.length === 0 && (
+        <p className="text-[10px] text-muted-foreground italic px-3">No projects yet</p>
+      )}
+    </div>
   );
 };

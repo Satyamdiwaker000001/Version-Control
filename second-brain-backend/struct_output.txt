@@ -1,0 +1,190 @@
+[32minfo[39m: ✅ MySQL database connected successfully {"service":"second-brain-api","timestamp":"2026-03-16 23:14:28"}
+user_integrations structure: [
+  {
+    Field: 'id',
+    Type: 'varchar(36)',
+    Null: 'NO',
+    Key: 'PRI',
+    Default: 'uuid()',
+    Extra: 'DEFAULT_GENERATED'
+  },
+  {
+    Field: 'user_id',
+    Type: 'varchar(36)',
+    Null: 'NO',
+    Key: 'MUL',
+    Default: null,
+    Extra: ''
+  },
+  {
+    Field: 'provider',
+    Type: 'varchar(50)',
+    Null: 'NO',
+    Key: 'MUL',
+    Default: null,
+    Extra: ''
+  },
+  {
+    Field: 'provider_user_id',
+    Type: 'varchar(100)',
+    Null: 'NO',
+    Key: '',
+    Default: null,
+    Extra: ''
+  },
+  {
+    Field: 'username',
+    Type: 'varchar(255)',
+    Null: 'YES',
+    Key: '',
+    Default: null,
+    Extra: ''
+  },
+  {
+    Field: 'access_token',
+    Type: 'text',
+    Null: 'NO',
+    Key: '',
+    Default: null,
+    Extra: ''
+  },
+  {
+    Field: 'refresh_token',
+    Type: 'text',
+    Null: 'YES',
+    Key: '',
+    Default: null,
+    Extra: ''
+  },
+  {
+    Field: 'profile_url',
+    Type: 'varchar(500)',
+    Null: 'YES',
+    Key: '',
+    Default: null,
+    Extra: ''
+  },
+  {
+    Field: 'expires_at',
+    Type: 'timestamp',
+    Null: 'YES',
+    Key: '',
+    Default: null,
+    Extra: ''
+  },
+  {
+    Field: 'created_at',
+    Type: 'timestamp',
+    Null: 'YES',
+    Key: '',
+    Default: 'CURRENT_TIMESTAMP',
+    Extra: 'DEFAULT_GENERATED'
+  },
+  {
+    Field: 'updated_at',
+    Type: 'timestamp',
+    Null: 'YES',
+    Key: '',
+    Default: 'CURRENT_TIMESTAMP',
+    Extra: 'DEFAULT_GENERATED on update CURRENT_TIMESTAMP'
+  }
+]
+user_preferences structure: [
+  {
+    Field: 'id',
+    Type: 'varchar(36)',
+    Null: 'NO',
+    Key: 'PRI',
+    Default: 'uuid()',
+    Extra: 'DEFAULT_GENERATED'
+  },
+  {
+    Field: 'user_id',
+    Type: 'varchar(36)',
+    Null: 'NO',
+    Key: 'UNI',
+    Default: null,
+    Extra: ''
+  },
+  {
+    Field: 'theme',
+    Type: 'varchar(20)',
+    Null: 'YES',
+    Key: '',
+    Default: 'system',
+    Extra: ''
+  },
+  {
+    Field: 'language',
+    Type: 'varchar(10)',
+    Null: 'YES',
+    Key: '',
+    Default: 'en',
+    Extra: ''
+  },
+  {
+    Field: 'timezone',
+    Type: 'varchar(50)',
+    Null: 'YES',
+    Key: '',
+    Default: 'UTC',
+    Extra: ''
+  },
+  {
+    Field: 'email_notifications',
+    Type: 'tinyint(1)',
+    Null: 'YES',
+    Key: '',
+    Default: '1',
+    Extra: ''
+  },
+  {
+    Field: 'push_notifications',
+    Type: 'tinyint(1)',
+    Null: 'YES',
+    Key: '',
+    Default: '1',
+    Extra: ''
+  },
+  {
+    Field: 'auto_save_interval',
+    Type: 'int',
+    Null: 'YES',
+    Key: '',
+    Default: '30',
+    Extra: ''
+  },
+  {
+    Field: 'preferences',
+    Type: 'json',
+    Null: 'YES',
+    Key: '',
+    Default: null,
+    Extra: ''
+  },
+  {
+    Field: 'created_at',
+    Type: 'timestamp',
+    Null: 'YES',
+    Key: '',
+    Default: 'CURRENT_TIMESTAMP',
+    Extra: 'DEFAULT_GENERATED'
+  },
+  {
+    Field: 'updated_at',
+    Type: 'timestamp',
+    Null: 'YES',
+    Key: '',
+    Default: 'CURRENT_TIMESTAMP',
+    Extra: 'DEFAULT_GENERATED on update CURRENT_TIMESTAMP'
+  },
+  {
+    Field: 'tutorial_completed',
+    Type: 'tinyint(1)',
+    Null: 'YES',
+    Key: '',
+    Default: '0',
+    Extra: ''
+  }
+]
+[32minfo[39m: ✅ MySQL database disconnected successfully {"service":"second-brain-api","timestamp":"2026-03-16 23:14:28"}

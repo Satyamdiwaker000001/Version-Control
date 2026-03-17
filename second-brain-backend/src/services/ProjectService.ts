@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 export interface Project {
   id: string;
   user_id: string;
+  workspace_id?: string;
   name: string;
   description?: string;
   color: string;
@@ -30,16 +31,17 @@ export class ProjectService {
 
   async createProject(userId: string, data: Partial<Project>): Promise<Project> {
     const id = uuidv4();
-    const { name, description, color, is_public, settings } = data;
+    const { name, description, color, is_public, settings, workspace_id } = data;
     
     const query = `
-      INSERT INTO projects (id, user_id, name, description, color, is_public, settings)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO projects (id, user_id, workspace_id, name, description, color, is_public, settings)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
     
     await this.database.query(query, [
       id,
       userId,
+      workspace_id || null,
       name,
       description || null,
       color || '#3B82F6',
@@ -54,7 +56,7 @@ export class ProjectService {
   }
 
   async updateProject(userId: string, projectId: string, data: Partial<Project>): Promise<Project> {
-    const { name, description, color, is_public, settings } = data;
+    const { name, description, color, is_public, settings, workspace_id } = data;
     
     const updates: string[] = [];
     const params: any[] = [];
@@ -79,6 +81,10 @@ export class ProjectService {
       updates.push('settings = ?');
       params.push(JSON.stringify(settings));
     }
+    if (workspace_id !== undefined) {
+      updates.push('workspace_id = ?');
+      params.push(workspace_id);
+    }
 
     if (updates.length === 0) {
       const existing = await this.getProjectById(userId, projectId);
@@ -100,5 +106,57 @@ export class ProjectService {
   async deleteProject(userId: string, projectId: string): Promise<void> {
     const query = 'DELETE FROM projects WHERE user_id = ? AND id = ?';
     await this.database.query(query, [userId, projectId]);
+  }
+
+  // --- Task Management ---
+
+  async addTask(userId: string, projectId: string, taskData: any): Promise<Project> {
+    const project = await this.getProjectById(userId, projectId);
+    if (!project) throw new Error('Project not found');
+
+    const settings = project.settings || {};
+    if (!settings.tasks) settings.tasks = [];
+
+    const newTask = {
+      ...taskData,
+      id: `t_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      createdAt: new Date().toISOString()
+    };
+
+    settings.tasks.push(newTask);
+    return await this.updateProject(userId, projectId, { settings });
+  }
+
+  async updateTask(userId: string, projectId: string, taskId: string, updates: any): Promise<Project> {
+    const project = await this.getProjectById(userId, projectId);
+    if (!project) throw new Error('Project not found');
+
+    const settings = project.settings || {};
+    if (!settings.tasks) return project;
+
+    settings.tasks = settings.tasks.map((t: any) => 
+      t.id === taskId ? { ...t, ...updates } : t
+    );
+
+    return await this.updateProject(userId, projectId, { settings });
+  }
+
+  // --- Discussion Management ---
+
+  async addDiscussion(userId: string, projectId: string, discussionData: any): Promise<Project> {
+    const project = await this.getProjectById(userId, projectId);
+    if (!project) throw new Error('Project not found');
+
+    const settings = project.settings || {};
+    if (!settings.discussions) settings.discussions = [];
+
+    const newDiscussion = {
+      ...discussionData,
+      id: `d_${Date.now()}`,
+      createdAt: new Date().toISOString()
+    };
+
+    settings.discussions.push(newDiscussion);
+    return await this.updateProject(userId, projectId, { settings });
   }
 }

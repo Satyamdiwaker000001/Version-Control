@@ -1,24 +1,31 @@
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { OnboardingFlow } from '@/features/workspace/components/OnboardingFlow';
+import { OnboardingTutorial } from '@/features/onboarding/components/OnboardingTutorial';
+import { TutorialSystem } from '@/shared/components/TutorialSystem';
 import { CommandPalette } from './CommandPalette';
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import WorkspaceChat from '@/features/chat/components/WorkspaceChat';
 import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
+import { useProjectStore } from '@/features/projects/store/useProjectStore';
 
 export const AppLayout = () => {
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  
   const location = useLocation();
   const fetchWorkspaces = useWorkspaceStore(state => state.fetchWorkspaces);
+  const fetchProjects = useProjectStore(state => state.fetchProjects);
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
 
   // Close mobile sidebar on route change
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMobileSidebarOpen(false);
   }, [location.pathname]);
 
@@ -34,10 +41,20 @@ export const AppLayout = () => {
     return () => document.removeEventListener('keydown', down);
   }, []);
 
-  // Fetch workspaces on mount if authenticated
+  // Fetch workspaces and projects on mount if authenticated
   useEffect(() => {
     if (isAuthenticated) {
       fetchWorkspaces();
+      fetchProjects();
+      
+      // Check if it's a first-time user
+      const params = new URLSearchParams(window.location.search);
+      const isNewUser = params.get('isNewUser') === 'true';
+      const tutorialCompleted = localStorage.getItem('tutorialCompleted') === 'true';
+      
+      if (isNewUser && !tutorialCompleted) {
+        setIsOnboardingOpen(true);
+      }
     }
   }, [isAuthenticated, fetchWorkspaces]);
 
@@ -48,6 +65,7 @@ export const AppLayout = () => {
       <Header
         onOpenCommand={() => setIsCommandOpen(true)}
         onToggleMobileSidebar={() => setIsMobileSidebarOpen(v => !v)}
+        onOpenTutorial={() => setIsTutorialOpen(true)}
       />
 
       <div className="flex-1 flex overflow-hidden relative">
@@ -111,6 +129,23 @@ export const AppLayout = () => {
 
       <CommandPalette open={isCommandOpen} setOpen={setIsCommandOpen} />
       <WorkspaceChat />
+
+      <OnboardingFlow 
+        isOpen={isOnboardingOpen} 
+        onClose={() => setIsOnboardingOpen(false)} 
+        onComplete={() => {
+          setIsOnboardingOpen(false);
+          setIsTutorialOpen(true);
+          localStorage.setItem('tutorialCompleted', 'true');
+        }} 
+      />
+
+      <TutorialSystem 
+        isOpen={isTutorialOpen} 
+        onClose={() => setIsTutorialOpen(false)} 
+      />
+
+      {isTutorialOpen && <OnboardingTutorial onClose={() => setIsTutorialOpen(false)} />}
     </div>
   );
 };

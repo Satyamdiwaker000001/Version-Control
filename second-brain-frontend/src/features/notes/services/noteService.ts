@@ -34,27 +34,27 @@ export interface UpdateNoteInput {
   tagIds?: string[];
 }
 
-const API_BASE = '/api/notes';
+const API_BASE = '/notes';
 
 export const noteService = {
   async createNote(input: CreateNoteInput): Promise<Note> {
-    const { data } = await apiClient.post<Note>(`${API_BASE}`, input);
-    return data;
+    const { data } = await apiClient.post<any>(`${API_BASE}`, input);
+    return data.data || data;
   },
 
   async listNotes(params?: { workspaceId?: string; tagId?: string; limit?: number; offset?: number }): Promise<{ notes: Note[]; total: number }> {
-    const { data } = await apiClient.get<{ notes: Note[]; total: number }>(`${API_BASE}`, { params });
-    return data;
+    const { data } = await apiClient.get<any>(`${API_BASE}`, { params });
+    return data.data || data;
   },
 
   async getNote(noteId: string): Promise<Note> {
-    const { data } = await apiClient.get<Note>(`${API_BASE}/${noteId}`);
-    return data;
+    const { data } = await apiClient.get<any>(`${API_BASE}/${noteId}`);
+    return data.data || data;
   },
 
   async updateNote(noteId: string, input: UpdateNoteInput): Promise<Note> {
-    const { data } = await apiClient.put<Note>(`${API_BASE}/${noteId}`, input);
-    return data;
+    const { data } = await apiClient.put<any>(`${API_BASE}/${noteId}`, input);
+    return data.data || data;
   },
 
   async deleteNote(noteId: string): Promise<void> {

@@ -91,4 +91,44 @@ router.delete('/:id', authenticateToken, asyncHandler(async (req: Request, res: 
   });
 }));
 
+// Get note versions
+router.get('/:id/versions', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const versions = await noteService.getNoteVersions(req.user.id, req.params.id as string);
+  res.json({
+    success: true,
+    data: versions,
+  });
+}));
+
+// Restore a version
+router.post('/:id/versions/:versionId/restore', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const note = await noteService.restoreVersion(req.user.id, req.params.id as string, req.params.versionId as string);
+  res.json({
+    success: true,
+    data: note,
+    message: 'Version restored successfully',
+  });
+}));
+
+// Link repository
+router.post('/:id/repositories', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const { repositoryId } = req.body;
+  if (!repositoryId) throw createError('Repository ID is required', 400);
+
+  await noteService.linkRepository(req.user.id, req.params.id as string, repositoryId);
+  res.json({
+    success: true,
+    message: 'Repository linked successfully',
+  });
+}));
+
+// Unlink repository
+router.delete('/:id/repositories/:repositoryId', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  await noteService.unlinkRepository(req.user.id, req.params.id as string, req.params.repositoryId as string);
+  res.json({
+    success: true,
+    message: 'Repository unlinked successfully',
+  });
+}));
+
 export default router;
