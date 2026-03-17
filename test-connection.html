@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GitHub Connection Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .success { color: green; }
+        .error { color: red; }
+        .button { background: #0366d6; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 10px 5px; }
+        .result { margin: 20px 0; padding: 15px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🔗 GitHub Connection Test</h1>
+    
+    <h2>Test Connection Through Frontend Proxy</h2>
+    <button onclick="testBackend()" class="button">Test Backend (via proxy)</button>
+    <button onclick="testGitHubAuth()" class="button">Test GitHub Auth (via proxy)</button>
+    
+    <div id="result" class="result"></div>
+
+    <script>
+        async function testBackend() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Testing backend connection...</p>';
+            
+            try {
+                const response = await fetch('/api/github/test');
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `<div class="success">✅ Backend Connection Successful!</div>
+                    <p><strong>Status:</strong> ${data.message}</p>
+                    <p><strong>GitHub Config:</strong> Client ID ${data.github_config.client_id}</p>
+                    <p><strong>Callback URL:</strong> ${data.github_config.redirect_uri}</p>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Backend Connection Failed</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Network Error: ${error.message}</div>`;
+            }
+        }
+
+        async function testGitHubAuth() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Testing GitHub auth URL...</p>';
+            
+            try {
+                const response = await fetch('/api/github/auth/url');
+                const data = await response.json();
+                
+                if (data.success && data.data?.authUrl) {
+                    resultDiv.innerHTML = `<div class="success">✅ GitHub Auth URL Generated!</div>
+                    <p><strong>Auth URL:</strong> <a href="${data.data.authUrl}" target="_blank">Click here to test GitHub OAuth</a></p>
+                    <p><strong>URL Preview:</strong> ${data.data.authUrl.substring(0, 100)}...</p>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ GitHub Auth Failed: ${data.message}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ GitHub Auth Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

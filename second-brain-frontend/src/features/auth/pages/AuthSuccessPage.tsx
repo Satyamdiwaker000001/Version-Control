@@ -10,12 +10,14 @@ const AuthSuccessPage = () => {
 
   useEffect(() => {
     const token = searchParams.get('token');
+    const refreshToken = searchParams.get('refresh');
     
     if (token) {
-      // In a real app, we'd fetch the user profile here with the token
-      // For now, we'll use a temporary user object and then call checkAuth 
-      // which will fetch the real user from /auth/me
+      // Store both tokens
       localStorage.setItem('authToken', token);
+      if (refreshToken) {
+        localStorage.setItem('refreshToken', refreshToken);
+      }
       
       const finalizeAuth = async () => {
         try {

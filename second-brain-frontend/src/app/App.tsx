@@ -11,6 +11,7 @@ import { AuthLayout } from '@/shared/layout/AuthLayout';
 import LoginPage from '@/features/auth/pages/LoginPage';
 import RegisterPage from '@/features/auth/pages/RegisterPage';
 import AuthSuccessPage from '@/features/auth/pages/AuthSuccessPage';
+import AuthErrorPage from '@/features/auth/pages/AuthErrorPage';
 import DashboardPage from '@/features/analytics/components/DashboardPage';
 import NoteEditorPage from '@/features/notes/components/NoteEditorPage';
 import GraphPage from '@/features/graph/components/GraphPage';
@@ -132,6 +133,7 @@ function App() {
               } 
             />
             <Route path="/auth/success" element={<AuthSuccessPage />} />
+            <Route path="/auth/error" element={<AuthErrorPage />} />
           </Route>
           
           {/* Protected Area Routes */}

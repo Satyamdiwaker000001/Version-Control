@@ -172,6 +172,7 @@ export class NoteService {
   async updateNote(userId: string, noteId: string, data: NoteUpdateData): Promise<Note> {
     const {
       project_id,
+      workspace_id,
       title,
       content,
       content_type,

@@ -18,9 +18,15 @@ export const GithubConnectPage = () => {
   useEffect(() => {
     const checkConnection = async () => {
       setIsCheckingAuth(true);
-      const connected = await githubService.isConnected();
-      setIsConnected(connected);
-      setIsCheckingAuth(false);
+      try {
+        const connected = await githubService.isConnected();
+        setIsConnected(connected);
+      } catch (error) {
+        console.log('Connection check failed:', error);
+        setIsConnected(false);
+      } finally {
+        setIsCheckingAuth(false);
+      }
     };
     checkConnection();
   }, []);
@@ -46,10 +52,30 @@ export const GithubConnectPage = () => {
   const handleConnect = async () => {
     setIsConnecting(true);
     try {
+      console.log('Starting GitHub connection...');
+      
+      // First test backend connection
+      const isBackendConnected = await githubService.testConnection();
+      if (!isBackendConnected) {
+        throw new Error('Backend server is not responding. Please check if the backend is running on port 3001.');
+      }
+      
+      // Then attempt GitHub connection
       await githubService.connect();
       // Redirect happens in githubService.connect()
     } catch (error) {
       console.error('Connection failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      
+      // Provide more specific error messages
+      if (errorMessage.includes('Backend server is not responding')) {
+        alert('❌ Backend Connection Error\n\nPlease ensure the backend server is running on port 3001.\n\nYou can start it with:\ncd second-brain-backend && npm run dev');
+      } else if (errorMessage.includes('Network Error')) {
+        alert('❌ Network Error\n\nUnable to connect to the backend server.\n\nPlease check:\n1. Backend is running on port 3001\n2. No firewall blocking the connection\n3. CORS is properly configured');
+      } else {
+        alert(`❌ GitHub Connection Failed\n\n${errorMessage}\n\nPlease try again or contact support if the issue persists.`);
+      }
+      
       setIsConnecting(false);
     }
   };
@@ -60,11 +86,14 @@ export const GithubConnectPage = () => {
     setRepositories([]);
   };
 
-  const handleSync = async (repoId: string) => {
-    await githubService.syncRepository(repoId);
-    setRepositories(repos => repos.map(r => 
-      r.id === repoId ? { ...r, synced: true } : r
-    ));
+  const handleSync = async (repoId: string, fullName: string) => {
+    const [owner, name] = fullName.split('/');
+    const success = await githubService.syncRepository(repoId, owner, name);
+    if (success) {
+      setRepositories(repos => repos.map(r => 
+        r.id === repoId ? { ...r, synced: true } : r
+      ));
+    }
   };
 
   if (isCheckingAuth) {
@@ -186,7 +215,7 @@ export const GithubConnectPage = () => {
                       </button>
                     ) : (
                       <button 
-                        onClick={() => handleSync(repo.id)}
+                        onClick={() => handleSync(repo.id, repo.fullName)}
                         className="w-full h-9 rounded-md bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 text-sm font-medium hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-500 transition-colors flex items-center justify-center gap-2"
                       >
                         <Plus className="w-4 h-4" /> Sync Repository
