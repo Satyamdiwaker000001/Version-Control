@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNoteStore } from '@/features/notes/store/useNoteStore';
 import type { NoteState } from '@/features/notes/store/useNoteStore';
 import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
-import { GitBranch, Filter, GitCommit, Search, Plus } from 'lucide-react';
+import { GitBranch, Filter, GitCommit, Search, Plus, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/shared/ui/Button';
 import { GitGraph, GitCommitData } from './GitGraph';
@@ -142,6 +142,16 @@ export const GraphPage = () => {
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
+            {/* Contextual Help Icon */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 text-muted-foreground hover:text-primary transition-colors"
+              title="Help: This graph shows your knowledge evolution and note versions over time. Each bubble is a 'Commit' (save) of a note."
+            >
+              <Info size={18} />
+            </Button>
+
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
               <input 
@@ -187,7 +197,17 @@ export const GraphPage = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
-        {commitData.length > 0 ? (
+        {notes.filter(n => n.workspaceId === activeWorkspace?.id).length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-center p-8">
+            <div className="w-20 h-20 rounded-full bg-accent flex items-center justify-center mb-4">
+              <Plus size={32} className="text-muted-foreground opacity-50" />
+            </div>
+            <h3 className="text-lg font-bold">No knowledge nodes yet</h3>
+            <p className="text-muted-foreground text-sm max-w-xs">
+              Start by creating notes to visualize your knowledge graph.
+            </p>
+          </div>
+        ) : commitData.length > 0 ? (
           <div className="max-w-4xl mx-auto">
             <GitGraph 
               commits={commitData} 

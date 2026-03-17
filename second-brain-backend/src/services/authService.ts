@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { DatabaseConnection } from '@/database/DatabaseConnection';
 import { RedisConnection } from '@/database/RedisConnection';
 import { logger } from '@/utils/logger';
+import { CustomError } from '@/middleware/errorHandler';
 
 export interface User {
   id: string;
@@ -54,7 +55,7 @@ export class AuthService {
       // Check if user already exists
       const existingUser = await this.getUserByEmail(userData.email);
       if (existingUser) {
-        throw new Error('User with this email already exists');
+        throw new CustomError('User with this email already exists', 400);
       }
 
       // Hash password if provided
@@ -93,35 +94,82 @@ export class AuthService {
       await this.storeSession(user.id, tokens);
 
       // --- Professional Onboarding (NUX) ---
-      // 1. Create Default "Personal Space" Project
+      // 1. Create Default Workspace
+      const workspaceId = uuidv4();
+      await this.database.query(`
+        INSERT INTO workspaces (id, owner_id, name, slug, description, type)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `, [
+        workspaceId,
+        userId,
+        'Personal Workspace',
+        `personal-${userId.substring(0, 8)}`,
+        'Your private workspace for collaboration and knowledge.',
+        'solo'
+      ]);
+
+      // 2. Add user as Workspace Owner
+      await this.database.query(`
+        INSERT INTO workspace_members (id, workspace_id, user_id, role)
+        VALUES (?, ?, ?, ?)
+      `, [uuidv4(), workspaceId, userId, 'owner']);
+
+      // 3. Create #general Channel
+      const channelId = uuidv4();
+      await this.database.query(`
+        INSERT INTO channels (id, workspace_id, name, description, type)
+        VALUES (?, ?, ?, ?, ?)
+      `, [
+        channelId,
+        workspaceId,
+        'general',
+        'General discussion for this workspace',
+        'text'
+      ]);
+
+      // 4. Create Default "Personal Vault" Project
       const projectId = uuidv4();
       await this.database.query(`
-        INSERT INTO projects (id, user_id, name, description, color, is_public)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO projects (id, user_id, workspace_id, name, description, color, is_public)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `, [
         projectId,
         userId,
-        'Personal Space',
-        'Your private space for notes and ideas.',
-        '#8b5cf6', // Violet color
+        workspaceId,
+        'Personal Vault',
+        'Your private vault for notes and ideas.',
+        '#3b82f6', // Professional blue
         false
       ]);
 
-      // 2. Create "Welcome to Noetic" Note
+      // 5. Create "Welcome to Second Brain" Note
       const noteId = uuidv4();
       await this.database.query(`
-        INSERT INTO notes (id, user_id, project_id, title, content, content_type)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO notes (id, user_id, project_id, workspace_id, title, content, content_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `, [
         noteId,
         userId,
         projectId,
-        'Welcome to Noetic! 👋',
-        '# Welcome back!\n\nThis is your personal space. You can create notes, organize them with tags, and link them together.\n\n### Getting Started\n- Click the **+ New Note** button to start writing.\n- Use **Markdown** to format your thoughts.\n- Tag your notes to stay organized.\n\nHappy thinking! ✨',
+        workspaceId,
+        'Welcome to Second Brain! 👋',
+        '# Welcome to your second brain!\n\nThis is your personal workspace. You can create notes, organize them into projects, and link them together to build a knowledge network.\n\n### Getting Started\n- **Create Notes**: Use the editor to write down your thoughts.\n- **Projects**: Group related notes into projects (like this "Personal Vault").\n- **Chat**: Use channels to discuss ideas (check out #general).\n- **GitHub**: Connect your GitHub account to sync repositories and track code changes.\n\nHappy thinking! ✨',
         'markdown'
       ]);
 
-      logger.info(`👤 New user registered and initialized: ${user.email}`);
+      // 6. Create Starter Message from System Bot
+      await this.database.query(`
+        INSERT INTO messages (id, channel_id, user_id, content, is_system)
+        VALUES (?, ?, ?, ?, ?)
+      `, [
+        uuidv4(),
+        channelId,
+        null, // System bot
+        'Welcome to your workspace. Start by creating a note or connecting GitHub.',
+        true
+      ]);
+
+      logger.info(`👤 New user registered and initialized: ${user.email} with workspace ${workspaceId}`);
       
       return { 
         user, 
@@ -139,18 +187,18 @@ export class AuthService {
       // Get user by email
       const user = await this.getUserByEmail(credentials.email);
       if (!user) {
-        throw new Error('Invalid email or password');
+        throw new CustomError('Invalid email or password', 401);
       }
 
       // Check if user has password (GitHub users might not)
       if (!user.password_hash) {
-        throw new Error('Please use GitHub login for this account');
+        throw new CustomError('Please use GitHub login for this account', 400);
       }
 
       // Verify password
       const isValidPassword = await bcrypt.compare(credentials.password, user.password_hash);
       if (!isValidPassword) {
-        throw new Error('Invalid email or password');
+        throw new CustomError('Invalid email or password', 401);
       }
 
       // Update last login

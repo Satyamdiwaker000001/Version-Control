@@ -1,0 +1,34 @@
+[32minfo[39m: ✅ MySQL database connected successfully {"service":"second-brain-api","timestamp":"2026-03-16 23:13:33"}
+Tables: [
+  { Tables_in_version_control_db: 'analytics_events' },
+  { Tables_in_version_control_db: 'api_keys' },
+  { Tables_in_version_control_db: 'channels' },
+  { Tables_in_version_control_db: 'github_commits' },
+  { Tables_in_version_control_db: 'github_repositories' },
+  { Tables_in_version_control_db: 'messages' },
+  { Tables_in_version_control_db: 'migrations' },
+  { Tables_in_version_control_db: 'note_commits' },
+  { Tables_in_version_control_db: 'note_tags' },
+  { Tables_in_version_control_db: 'notes' },
+  { Tables_in_version_control_db: 'projects' },
+  { Tables_in_version_control_db: 'tags' },
+  { Tables_in_version_control_db: 'user_integrations' },
+  { Tables_in_version_control_db: 'user_preferences' },
+  { Tables_in_version_control_db: 'user_sessions' },
+  { Tables_in_version_control_db: 'users' },
+  { Tables_in_version_control_db: 'workspace_members' },
+  { Tables_in_version_control_db: 'workspaces' }
+]
+Executed Migrations: [
+  {
+    id: 1,
+    name: '001_initial_schema',
+    executed_at: 2026-03-15T10:05:17.000Z
+  },
+  {
+    id: 2,
+    name: '002_add_workspaces_and_chat',
+    executed_at: 2026-03-15T16:22:43.000Z
+  }
+]
+[32minfo[39m: ✅ MySQL database disconnected successfully {"service":"second-brain-api","timestamp":"2026-03-16 23:13:33"}

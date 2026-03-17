@@ -1,4 +1,5 @@
-import { useMemo, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import apiClient from '@/shared/api/apiClient';
 import { useNoteStore } from '@/features/notes/store/useNoteStore';
 import type { NoteState } from '@/features/notes/store/useNoteStore';
 import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
@@ -50,12 +51,23 @@ const AuthorPill = () => {
 const SoloDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) => {
   const navigate = useNavigate();
   const tags = useTagStore(s => s.tags);
+  const [stats, setStats] = useState<any>(null);
+  
+  useEffect(() => {
+    apiClient.get('/analytics/dashboard').then(res => {
+      if (res.data.success) {
+        setStats(res.data.data);
+      }
+    });
+  }, []);
+
   const pinnedNotes = notes.filter(n => n.isPinned);
   const recentNotes = [...notes]
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, 5);
-  const totalWords = notes.reduce((acc, n) => acc + n.content.split(' ').length, 0);
-  const totalVersions = notes.reduce((acc, n) => acc + n.versionCount, 0);
+
+  const totalWords = stats?.total_words || notes.reduce((acc, n) => acc + (n.content?.split(' ').length || 0), 0);
+  const totalVersions = stats?.total_versions || notes.reduce((acc, n) => acc + (n.versionCount || 1), 0);
 
   return (
     <div className="space-y-8 pb-12">
@@ -99,10 +111,10 @@ const SoloDashboard = ({ notes, workspace }: { notes: Note[]; workspace: any }) 
       <FadeIn delay={0.05}>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { label: 'Notes', value: notes.length, icon: FileText, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+            { label: 'Notes', value: stats?.total_notes || notes.length, icon: FileText, color: 'text-blue-500', bg: 'bg-blue-500/10' },
             { label: 'Versions', value: totalVersions, icon: GitCommit, color: 'text-violet-500', bg: 'bg-violet-500/10' },
-            { label: 'Total Tags', value: tags.length, icon: Hash, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-            { label: 'Words Written', value: `${(totalWords / 1000).toFixed(1)}k`, icon: BookOpen, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+            { label: 'Total Tags', value: stats?.total_tags || tags.length, icon: Hash, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+            { label: 'Words Written', value: stats?.total_words ? `${(stats.total_words / 1000).toFixed(1)}k` : `${(totalWords / 1000).toFixed(1)}k`, icon: BookOpen, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
           ].map((stat, i) => (
             <Card key={i} className="hover:border-primary/30 transition-all cursor-default group">
               <CardContent className="p-5 flex items-center justify-between">

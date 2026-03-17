@@ -15,6 +15,7 @@ const preferencesSchema = Joi.object({
   email_notifications: Joi.boolean(),
   push_notifications: Joi.boolean(),
   auto_save_interval: Joi.number().min(1).max(3600),
+  tutorial_completed: Joi.boolean(),
   preferences: Joi.object().allow(null),
 });
 

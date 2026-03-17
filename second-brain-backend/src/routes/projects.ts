@@ -12,6 +12,7 @@ const projectService = new ProjectService(database);
 const projectSchema = Joi.object({
   name: Joi.string().min(1).max(255).required(),
   description: Joi.string().max(1000).allow('', null),
+  workspace_id: Joi.string().uuid().allow(null, 'ws1'),
   color: Joi.string().pattern(/^#[0-9A-F]{6}$/i).default('#3B82F6'),
   is_public: Joi.boolean().default(false),
   settings: Joi.object().allow(null),
@@ -40,7 +41,7 @@ router.get('/:id', authenticateToken, asyncHandler(async (req: Request, res: Res
 
 // Create a new project
 router.post('/', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
-  const { error, value } = projectSchema.validate(req.body);
+  const { error, value } = projectSchema.validate(req.body, { allowUnknown: true });
   if (error) {
     throw createError(error.details[0]?.message || 'Validation failed', 400);
   }
@@ -74,6 +75,36 @@ router.delete('/:id', authenticateToken, asyncHandler(async (req: Request, res: 
   res.json({
     success: true,
     message: 'Project deleted successfully',
+  });
+}));
+
+// Add task to project
+router.post('/:id/tasks', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const project = await projectService.addTask(req.user.id, req.params.id as string, req.body);
+  res.json({
+    success: true,
+    data: project,
+    message: 'Task added successfully',
+  });
+}));
+
+// Update task in project
+router.patch('/:id/tasks/:taskId', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const project = await projectService.updateTask(req.user.id, req.params.id as string, req.params.taskId as string, req.body);
+  res.json({
+    success: true,
+    data: project,
+    message: 'Task updated successfully',
+  });
+}));
+
+// Add discussion to project
+router.post('/:id/discussions', authenticateToken, asyncHandler(async (req: Request, res: Response) => {
+  const project = await projectService.addDiscussion(req.user.id, req.params.id as string, req.body);
+  res.json({
+    success: true,
+    data: project,
+    message: 'Discussion added successfully',
   });
 }));
 

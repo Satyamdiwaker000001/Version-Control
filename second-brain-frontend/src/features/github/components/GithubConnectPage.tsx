@@ -5,19 +5,36 @@ import { Github, RefreshCw, FolderGit2, Star, Plus, ArrowRight } from 'lucide-re
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { GithubInsightsDashboard } from './GithubInsightsDashboard';
+import { GithubProfileCard } from './GithubProfileCard';
 
 export const GithubConnectPage = () => {
-  const [isConnected, setIsConnected] = useState(githubService.isConnected());
+  const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [repositories, setRepositories] = useState<GithubRepository[]>([]);
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const checkConnection = async () => {
+      setIsCheckingAuth(true);
+      const connected = await githubService.isConnected();
+      setIsConnected(connected);
+      setIsCheckingAuth(false);
+    };
+    checkConnection();
+  }, []);
 
   const loadRepositories = async () => {
     setIsLoadingRepos(true);
-    const repos = await githubService.getRepositories();
-    setRepositories(repos);
-    setIsLoadingRepos(false);
+    try {
+      const repos = await githubService.getRepositories();
+      setRepositories(repos);
+    } catch (error) {
+      console.error('Failed to load repositories:', error);
+    } finally {
+      setIsLoadingRepos(false);
+    }
   };
 
   useEffect(() => {
@@ -28,9 +45,13 @@ export const GithubConnectPage = () => {
 
   const handleConnect = async () => {
     setIsConnecting(true);
-    const success = await githubService.connect();
-    setIsConnected(success);
-    setIsConnecting(false);
+    try {
+      await githubService.connect();
+      // Redirect happens in githubService.connect()
+    } catch (error) {
+      console.error('Connection failed:', error);
+      setIsConnecting(false);
+    }
   };
 
   const handleDisconnect = async () => {
@@ -45,6 +66,17 @@ export const GithubConnectPage = () => {
       r.id === repoId ? { ...r, synced: true } : r
     ));
   };
+
+  if (isCheckingAuth) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-zinc-500 dark:text-zinc-400">Checking GitHub connection...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10 max-w-5xl mx-auto w-full pt-4">
@@ -90,6 +122,7 @@ export const GithubConnectPage = () => {
       {/* Main Content */}
       {isConnected && (
         <div className="space-y-6">
+          <GithubProfileCard />
           <GithubInsightsDashboard />
           
           <div className="flex items-center justify-between">

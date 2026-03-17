@@ -87,7 +87,7 @@ export class DatabaseConnection implements DatabaseInterface {
     }
 
     try {
-      const [rows, fields] = await this.pool.execute(sql, params);
+      const [rows, fields] = await this.pool.query(sql, params);
       
       const result = {
         rows: rows as T[],

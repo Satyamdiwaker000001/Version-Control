@@ -25,6 +25,8 @@ import notesRoutes from '@/routes/notes';
 import projectsRoutes from '@/routes/projects';
 import tagsRoutes from '@/routes/tags';
 import analyticsRoutes from '@/routes/analytics';
+import workspaceRoutes from '@/routes/workspaces';
+import chatRoutes from '@/routes/chats';
 
 // Load environment variables
 dotenv.config();
@@ -60,8 +62,14 @@ class Application {
     }));
 
     // CORS configuration
+    const allowedOrigins = [
+      process.env.FRONTEND_URL || 'http://localhost:5173',
+      'http://localhost:5174',
+      'http://localhost:5175',
+    ].filter(Boolean) as string[];
+
     this.app.use(cors({
-      origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+      origin: allowedOrigins,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
@@ -115,6 +123,8 @@ class Application {
     this.app.use('/api/projects', projectsRoutes);
     this.app.use('/api/tags', tagsRoutes);
     this.app.use('/api/analytics', analyticsRoutes);
+    this.app.use('/api/workspaces', workspaceRoutes);
+    this.app.use('/api/chats', chatRoutes);
 
     // Mount API router
     this.app.use('/api', apiRouter);
@@ -124,7 +134,6 @@ class Application {
       res.json({
         message: 'Second Brain API',
         version: '1.0.0',
-        documentation: '/api/docs',
       });
     });
   }
@@ -154,7 +163,6 @@ class Application {
 
       this.server.listen(port, () => {
         logger.info(`🚀 Server running on port ${port} in ${process.env.NODE_ENV} mode`);
-        logger.info(`📚 API documentation available at http://localhost:${port}/api/docs`);
       });
 
       // Graceful shutdown signals

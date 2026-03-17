@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
 import type { ProjectTask, ProjectDiscussion } from '../store/useProjectStore';
 import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
@@ -26,8 +26,16 @@ export const ProjectPage = () => {
   const { projects, activeProjectId } = useProjectStore();
   const [view, setView] = useState<'kanban' | 'discussions'>('kanban');
 
+  const fetchProjects = useProjectStore(state => state.fetchProjects);
+
+  useEffect(() => {
+    if (projects.length === 0) {
+      fetchProjects();
+    }
+  }, [fetchProjects, projects.length]);
+
   const activeProject = useMemo(() => 
-    projects.find(p => p.id === activeProjectId && p.workspaceId === (activeWorkspace?.id || '1')),
+    projects.find(p => p.id === activeProjectId && p.workspaceId === (activeWorkspace?.id || 'ws1')),
   [projects, activeProjectId, activeWorkspace]);
 
   if (!activeProject) {
@@ -38,7 +46,18 @@ export const ProjectPage = () => {
         </div>
         <h2 className="text-xl font-bold">No project active in this workspace</h2>
         <p className="text-muted-foreground text-sm max-w-xs">Select or create a project to start planning and discussing.</p>
-        <Button className="premium-shadow">Create New Project</Button>
+        <Button 
+          className="premium-shadow"
+          onClick={() => {
+            const name = prompt('Project name:');
+            const desc = prompt('Description:');
+            if (name) {
+              useProjectStore.getState().createProject(name, desc || '');
+            }
+          }}
+        >
+          Create New Project
+        </Button>
       </div>
     );
   }
@@ -91,7 +110,7 @@ export const ProjectPage = () => {
       {/* Main Content Area */}
       <main className="flex-1 overflow-hidden">
         {view === 'kanban' ? (
-          <KanbanBoard tasks={activeProject.tasks} />
+          <KanbanBoard tasks={activeProject.tasks} activeProject={activeProject} />
         ) : (
           <DiscussionList discussions={activeProject.discussions} />
         )}
@@ -102,7 +121,7 @@ export const ProjectPage = () => {
 
 // --- Subcomponents ---
 
-const KanbanBoard = ({ tasks }: { tasks: ProjectTask[] }) => {
+const KanbanBoard = ({ tasks, activeProject }: { tasks: ProjectTask[], activeProject: any }) => {
   const columns: { id: ProjectTask['status']; label: string; icon: any; color: string }[] = [
     { id: 'todo', label: 'To Do', icon: Circle, color: 'text-zinc-500' },
     { id: 'in-progress', label: 'In Progress', icon: Clock, color: 'text-amber-500' },
@@ -159,7 +178,21 @@ const KanbanBoard = ({ tasks }: { tasks: ProjectTask[] }) => {
                  </motion.div>
                ))}
                
-               <button className="w-full py-2 flex items-center justify-center gap-2 text-xs font-bold text-muted-foreground hover:text-primary transition-colors border border-dashed border-border rounded-xl hover:bg-primary/5 hover:border-primary/50 group">
+               <button 
+                 onClick={() => {
+                   const title = prompt('Task title:');
+                   if (title) {
+                     useProjectStore.getState().addTask(activeProject.id, {
+                       projectId: activeProject.id,
+                       title,
+                       description: '',
+                       status: 'todo',
+                       priority: 'medium'
+                     });
+                   }
+                 }}
+                 className="w-full py-2 flex items-center justify-center gap-2 text-xs font-bold text-muted-foreground hover:text-primary transition-colors border border-dashed border-border rounded-xl hover:bg-primary/5 hover:border-primary/50 group"
+               >
                   <Plus size={14} className="group-hover:scale-110 transition-transform" /> New Task
                </button>
             </div>

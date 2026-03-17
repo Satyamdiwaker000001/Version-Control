@@ -10,6 +10,7 @@ export interface UserPreferences {
   email_notifications: boolean;
   push_notifications: boolean;
   auto_save_interval: number;
+  tutorial_completed: boolean;
   preferences?: any;
   created_at?: Date;
   updated_at?: Date;
@@ -33,10 +34,15 @@ export class UserService {
         email_notifications: true,
         push_notifications: true,
         auto_save_interval: 30,
+        tutorial_completed: false,
       } as UserPreferences;
     }
     
-    return result.rows[0];
+    const prefs = result.rows[0];
+    return {
+      ...prefs,
+      tutorial_completed: !!prefs.tutorial_completed
+    };
   }
 
   async updatePreferences(userId: string, data: Partial<UserPreferences>): Promise<UserPreferences> {
@@ -44,7 +50,7 @@ export class UserService {
     
     const fields = [
       'theme', 'language', 'timezone', 'email_notifications', 
-      'push_notifications', 'auto_save_interval', 'preferences'
+      'push_notifications', 'auto_save_interval', 'tutorial_completed', 'preferences'
     ];
     
     const updates: string[] = [];

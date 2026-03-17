@@ -33,13 +33,19 @@ export const authenticateToken = asyncHandler(async (req: Request, res: Response
     const user = await authService.getCurrentUser(decoded.userId);
     
     if (!user) {
+      logger.warn(`Auth failure: User not found for ID ${decoded.userId}`);
       throw createError('User not found', 401);
     }
 
     req.user = user;
     next();
-  } catch (error) {
-    throw createError('Invalid or expired token', 401);
+  } catch (error: any) {
+    logger.error('Auth failure:', { 
+      message: error.message, 
+      stack: error.stack,
+      token: token.substring(0, 10) + '...'
+    });
+    throw createError(error.message || 'Invalid or expired token', 401);
   }
 });
 

@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import apiClient from '@/shared/api/apiClient';
+import { useWorkspaceStore } from '@/features/workspace/store/useWorkspaceStore';
 
 export interface ProjectTask {
   id: string;
@@ -38,127 +40,124 @@ export interface Project {
 interface ProjectStore {
   projects: Project[];
   activeProjectId: string | null;
+  isLoading: boolean;
+  
+  fetchProjects: () => Promise<void>;
   setActiveProject: (id: string) => void;
-  addTask: (projectId: string, task: Omit<ProjectTask, 'id' | 'createdAt'>) => void;
-  updateTask: (projectId: string, taskId: string, updates: Partial<ProjectTask>) => void;
+  addTask: (projectId: string, task: Omit<ProjectTask, 'id' | 'createdAt'>) => Promise<void>;
+  updateTask: (projectId: string, taskId: string, updates: Partial<ProjectTask>) => Promise<void>;
+  createProject: (name: string, description: string) => Promise<void>;
 }
 
-const MOCK_PROJECTS: Project[] = [
-  {
-    id: 'proj1',
-    workspaceId: 'ws1',
-    name: 'Second Brain Platform',
-    description: 'Building the core platform features and integrations.',
-    tasks: [
-      {
-        id: 't1',
-        projectId: 'proj1',
-        title: 'Implement Graph Visualization',
-        description: 'Create an interactive force-directed graph of note connections.',
-        status: 'done',
-        priority: 'high',
-        createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
-      },
-      {
-        id: 't2',
-        projectId: 'proj1',
-        title: 'GitHub Integration API',
-        description: 'Connect repositories and sync commits as note versions.',
-        status: 'in-progress',
-        priority: 'high',
-        createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-      },
-      {
-        id: 't3',
-        projectId: 'proj1',
-        title: 'AI-powered note suggestions',
-        description: 'Use GPT to suggest backlinks and related notes.',
-        status: 'todo',
-        priority: 'medium',
-        createdAt: new Date(Date.now() - 86400000).toISOString(),
-      },
-      {
-        id: 't4',
-        projectId: 'proj1',
-        title: 'Dark / Light theme system',
-        description: 'Implement a robust theme toggle with system preference detection.',
-        status: 'done',
-        priority: 'medium',
-        createdAt: new Date(Date.now() - 86400000 * 4).toISOString(),
-      },
-      {
-        id: 't5',
-        projectId: 'proj1',
-        title: 'Collaborative editing',
-        description: 'Real-time multi-user editing with conflict resolution.',
-        status: 'todo',
-        priority: 'low',
-        createdAt: new Date().toISOString(),
-      },
-    ],
-    discussions: [
-      {
-        id: 'disc1',
-        projectId: 'proj1',
-        title: 'Architecture decisions for the graph engine',
-        content: 'We need to decide between ForceGraph2D and D3 directly. I think ForceGraph2D provides a better abstraction...',
-        author: 'Alex Johnson',
-        replies: 5,
-        tags: ['architecture', 'graph'],
-        createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-      },
-      {
-        id: 'disc2',
-        projectId: 'proj1',
-        title: 'Backend API rate limiting strategy',
-        content: 'Given the GitHub API limits, should we cache aggressively or implement a queue?',
-        author: 'Sarah Chen',
-        replies: 3,
-        tags: ['backend', 'api'],
-        createdAt: new Date(Date.now() - 86400000).toISOString(),
-      },
-    ],
-    createdAt: new Date(Date.now() - 86400000 * 10).toISOString(),
-  },
-];
+export const useProjectStore = create<ProjectStore>((set, get) => ({
+  projects: [],
+  activeProjectId: null,
+  isLoading: false,
 
-export const useProjectStore = create<ProjectStore>((set) => ({
-  projects: MOCK_PROJECTS,
-  activeProjectId: MOCK_PROJECTS[0].id,
+  fetchProjects: async () => {
+    set({ isLoading: true });
+    try {
+      const res = await apiClient.get('/projects');
+      if (res.data.success) {
+        const mapped = res.data.data.map((p: any) => ({
+          id: p.id,
+          workspaceId: p.workspace_id || 'ws1',
+          name: p.name,
+          description: p.description || '',
+          tasks: p.settings?.tasks || [],
+          discussions: p.settings?.discussions || [],
+          createdAt: p.created_at
+        }));
+        set({ projects: mapped });
+        if (mapped.length > 0 && !get().activeProjectId) {
+          set({ activeProjectId: mapped[0].id });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch projects:', error);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
 
   setActiveProject: (id) => set({ activeProjectId: id }),
 
-  addTask: (projectId, taskData) =>
-    set((state) => ({
-      projects: state.projects.map((p) =>
-        p.id === projectId
-          ? {
-              ...p,
-              tasks: [
-                ...p.tasks,
-                {
-                  ...taskData,
-                  id: `t_${Date.now()}`,
-                  projectId,
-                  createdAt: new Date().toISOString(),
-                },
-              ],
-            }
-          : p
-      ),
-    })),
+  addTask: async (projectId, taskData) => {
+    try {
+      const res = await apiClient.post(`/projects/${projectId}/tasks`, taskData);
+      if (res.data.success) {
+        const p = res.data.data;
+        const updatedProject = {
+          id: p.id,
+          workspaceId: p.workspace_id || 'ws1',
+          name: p.name,
+          description: p.description || '',
+          tasks: p.settings?.tasks || [],
+          discussions: p.settings?.discussions || [],
+          createdAt: p.created_at
+        };
+        set((state) => ({
+          projects: state.projects.map(pk => pk.id === projectId ? updatedProject : pk)
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to add task:', error);
+    }
+  },
 
-  updateTask: (projectId, taskId, updates) =>
-    set((state) => ({
-      projects: state.projects.map((p) =>
-        p.id === projectId
-          ? {
-              ...p,
-              tasks: p.tasks.map((t) =>
-                t.id === taskId ? { ...t, ...updates } : t
-              ),
-            }
-          : p
-      ),
-    })),
+  updateTask: async (projectId, taskId, updates) => {
+    try {
+      const res = await apiClient.patch(`/projects/${projectId}/tasks/${taskId}`, updates);
+      if (res.data.success) {
+        const p = res.data.data;
+        const updatedProject = {
+          id: p.id,
+          workspaceId: p.workspace_id || 'ws1',
+          name: p.name,
+          description: p.description || '',
+          tasks: p.settings?.tasks || [],
+          discussions: p.settings?.discussions || [],
+          createdAt: p.created_at
+        };
+        set((state) => ({
+          projects: state.projects.map(pk => pk.id === projectId ? updatedProject : pk)
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to update task:', error);
+    }
+  },
+
+  createProject: async (name, description) => {
+    set({ isLoading: true });
+    try {
+      const activeWorkspace = useWorkspaceStore.getState().activeWorkspace;
+      const res = await apiClient.post('/projects', {
+        name,
+        description,
+        workspace_id: activeWorkspace?.id || 'ws1', // Fallback for legacy
+        color: '#3b82f6'
+      });
+      if (res.data.success) {
+        const p = res.data.data;
+        const newProject = {
+          id: p.id,
+          workspaceId: p.workspace_id || 'ws1',
+          name: p.name,
+          description: p.description || '',
+          tasks: [],
+          discussions: [],
+          createdAt: p.created_at
+        };
+        set((state) => ({
+          projects: [...state.projects, newProject],
+          activeProjectId: newProject.id
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to create project:', error);
+    } finally {
+      set({ isLoading: false });
+    }
+  },
 }));

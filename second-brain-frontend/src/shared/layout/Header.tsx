@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { 
   Sun, Moon, Bell, Search, X, Settings, LogOut, 
-  User, ChevronRight, Menu, Building2, User2, Plus, Check
+  User, ChevronRight, Menu, Building2, User2, Plus, Check,
+  HelpCircle, Sparkles
 } from 'lucide-react';
 import { useThemeStore } from '@/shared/store/useThemeStore';
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
@@ -16,10 +17,12 @@ import { NoeticLogo } from '@/shared/ui/NoeticLogo';
 
 export const Header = ({ 
   onOpenCommand, 
-  onToggleMobileSidebar 
+  onToggleMobileSidebar,
+  onOpenTutorial
 }: { 
   onOpenCommand: () => void;
   onToggleMobileSidebar: () => void;
+  onOpenTutorial: () => void;
 }) => {
   const { isDarkMode, setTheme } = useThemeStore();
   const { user, logout } = useAuthStore();
@@ -133,6 +136,15 @@ export const Header = ({
           title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
         >
           {isDarkMode ? <Sun size={17} /> : <Moon size={17} />}
+        </button>
+
+        {/* Help / Tutorial */}
+        <button
+          onClick={onOpenTutorial}
+          className="p-2 text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg transition-colors"
+          title="Open Tutorial"
+        >
+          <HelpCircle size={17} />
         </button>
 
         {/* Notifications */}
@@ -294,6 +306,7 @@ export const Header = ({
 
                 <div className="p-1.5">
                   {[
+                    { label: 'Start Tutorial', icon: Sparkles, action: () => { onOpenTutorial(); setUserOpen(false); } },
                     { label: 'Profile Settings', icon: User, action: () => { navigate('/settings/profile'); setUserOpen(false); } },
                     { label: 'Account Appearance', icon: Settings, action: () => { navigate('/settings/appearance'); setUserOpen(false); } },
                   ].map(item => (

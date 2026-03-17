@@ -10,6 +10,7 @@ import { AuthLayout } from '@/shared/layout/AuthLayout';
 // Pages
 import LoginPage from '@/features/auth/pages/LoginPage';
 import RegisterPage from '@/features/auth/pages/RegisterPage';
+import AuthSuccessPage from '@/features/auth/pages/AuthSuccessPage';
 import DashboardPage from '@/features/analytics/components/DashboardPage';
 import NoteEditorPage from '@/features/notes/components/NoteEditorPage';
 import GraphPage from '@/features/graph/components/GraphPage';
@@ -22,6 +23,12 @@ import { ProjectPage } from '@/features/projects/components/ProjectPage';
 
 // Store
 import { useAuthStore } from '@/features/auth/store/useAuthStore';
+import { OnboardingTutorial } from '@/features/onboarding/components/OnboardingTutorial';
+import apiClient from '@/shared/api/apiClient';
+
+export interface UserPreferences {
+  tutorial_completed: boolean;
+}
 
 // Loading component
 const LoadingScreen = () => (
@@ -56,7 +63,9 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 function App() {
   const initializeTheme = useThemeStore(state => state.initializeTheme);
   const checkAuth = useAuthStore(state => state.checkAuth);
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -75,6 +84,25 @@ function App() {
 
     initializeApp();
   }, [initializeTheme, checkAuth]);
+
+  useEffect(() => {
+    const checkTutorial = async () => {
+      if (isAuthenticated) {
+        try {
+          const response = await apiClient.get<{ success: boolean, data: UserPreferences }>('/user/preferences');
+          if (response.data.success && !response.data.data.tutorial_completed) {
+            setShowTutorial(true);
+          }
+        } catch (error) {
+          console.error('Failed to check tutorial status:', error);
+        }
+      }
+    };
+    
+    if (isInitialized && isAuthenticated) {
+      checkTutorial();
+    }
+  }, [isInitialized, isAuthenticated]);
 
   if (!isInitialized) {
     return <LoadingScreen />;
@@ -103,6 +131,7 @@ function App() {
                 </PublicRoute>
               } 
             />
+            <Route path="/auth/success" element={<AuthSuccessPage />} />
           </Route>
           
           {/* Protected Area Routes */}
@@ -124,6 +153,7 @@ function App() {
             <Route path="/settings/:tab?" element={<SettingsPage />} />
           </Route>
         </Routes>
+        {showTutorial && <OnboardingTutorial onClose={() => setShowTutorial(false)} />}
       </Router>
     </>
   );
