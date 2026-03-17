@@ -229,20 +229,30 @@ export class AuthService {
       let isNewUser = false;
 
       if (!user) {
-        // Create new user from GitHub data
-        const userData: CreateUserData = {
-          email: githubUser.email,
-          name: githubUser.name || githubUser.login,
-          avatar_url: githubUser.avatar_url,
-          github_id: githubUser.id.toString(),
-          github_username: githubUser.login,
-        };
+        // Check if user exists with same email
+        const existingUser = await this.getUserByEmail(githubUser.email);
+        
+        if (existingUser) {
+          // Link GitHub to existing user
+          console.log('🔗 loginWithGitHub - Found existing user:', { id: existingUser.id, name: existingUser.name, email: existingUser.email });
+          user = existingUser;
+          isNewUser = false;
+        } else {
+          // Create new user from GitHub data
+          const userData: CreateUserData = {
+            email: githubUser.email,
+            name: githubUser.name || githubUser.login,
+            avatar_url: githubUser.avatar_url,
+            github_id: githubUser.id.toString(),
+            github_username: githubUser.login,
+          };
 
-        const result = await this.register(userData);
-        user = result.user;
-        isNewUser = true;
+          const result = await this.register(userData);
+          user = result.user;
+          isNewUser = true;
+        }
       } else {
-        // Update GitHub info
+        // Update GitHub info for existing GitHub user
         await this.updateGitHubInfo(user.id, githubUser);
         
         // Generate new tokens
@@ -381,16 +391,16 @@ export class AuthService {
     await this.database.query(sql, [userId]);
   }
 
-  private async updateGitHubInfo(userId: string, githubUser: any): Promise<void> {
+  public async updateGitHubInfo(userId: string, githubUser: any): Promise<void> {
     const sql = `
       UPDATE users 
-      SET avatar_url = ?, github_username = ?, updated_at = CURRENT_TIMESTAMP 
+      SET avatar_url = ?, github_username = ?, github_id = ?, updated_at = CURRENT_TIMESTAMP 
       WHERE id = ?
     `;
-    await this.database.query(sql, [githubUser.avatar_url, githubUser.login, userId]);
+    await this.database.query(sql, [githubUser.avatar_url, githubUser.login, githubUser.id.toString(), userId]);
   }
 
-  private async generateTokens(user: User): Promise<AuthTokens> {
+  public async generateTokens(user: User): Promise<AuthTokens> {
     const payload = {
       userId: user.id,
       email: user.email,
@@ -410,7 +420,7 @@ export class AuthService {
     return { accessToken, refreshToken, expiresIn };
   }
 
-  private async storeSession(userId: string, tokens: AuthTokens): Promise<void> {
+  public async storeSession(userId: string, tokens: AuthTokens): Promise<void> {
     const sessionData = {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,

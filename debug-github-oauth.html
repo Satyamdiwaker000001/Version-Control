@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GitHub OAuth Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .button { background: #0366d6; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 10px 5px; }
+        .result { margin: 20px 0; padding: 15px; border-radius: 5px; background: #f5f5f5; }
+        .error { background: #fee; color: #c00; }
+        .success { background: #efe; color: #090; }
+    </style>
+</head>
+<body>
+    <h1>🔍 GitHub OAuth Debug Test</h1>
+    
+    <button onclick="testDirectConnection()" class="button">Test Direct Connection</button>
+    <button onclick="testGitHubAuth()" class="button">Test GitHub OAuth</button>
+    <button onclick="openGitHubDirectly()" class="button">Open GitHub Direct</button>
+    
+    <div id="result" class="result"></div>
+
+    <script>
+        async function testDirectConnection() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Testing direct connection to backend...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:3001/api/github/test');
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `<div class="success">✅ Direct Backend Connection Successful!</div>
+                    <p><strong>Status:</strong> ${data.message}</p>
+                    <p><strong>GitHub Config:</strong> ${data.github_config.client_id}</p>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Direct Connection Failed</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Direct Connection Error: ${error.message}</div>`;
+            }
+        }
+
+        async function testGitHubAuth() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Testing GitHub OAuth through frontend proxy...</p>';
+            
+            try {
+                const response = await fetch('/api/github/auth/url');
+                const data = await response.json();
+                
+                if (data.success && data.data?.authUrl) {
+                    resultDiv.innerHTML = `<div class="success">✅ GitHub OAuth URL Generated!</div>
+                    <p><strong>Auth URL:</strong> <a href="${data.data.authUrl}" target="_blank">Click here to test GitHub OAuth</a></p>
+                    <p><strong>URL Preview:</strong> ${data.data.authUrl.substring(0, 100)}...</p>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ GitHub OAuth Failed: ${data.message}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ GitHub OAuth Error: ${error.message}</div>`;
+            }
+        }
+
+        function openGitHubDirectly() {
+            // Direct GitHub OAuth URL for testing
+            const clientId = 'Ov23liwzls5dxhrKAvlt';
+            const redirectUri = 'http://localhost:3001/api/github/auth/callback';
+            const scopes = 'user:email repo read:org';
+            const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code`;
+            
+            window.open(authUrl, '_blank');
+        }
+    </script>
+</body>
+</html>

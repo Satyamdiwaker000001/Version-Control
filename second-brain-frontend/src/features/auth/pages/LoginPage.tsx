@@ -30,22 +30,16 @@ export const LoginPage = () => {
   const handleSocialLogin = async (provider: string) => {
     setIsSocialLoading(provider);
     try {
-      // Mock social login for now - will integrate with backend
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      const mockUser = {
-        id: `social_${Date.now()}`,
-        email: `user@${provider}.com`,
-        name: `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`,
-        createdAt: new Date().toISOString(),
+      // Redirect to backend OAuth for social login
+      const oauthUrls = {
+        google: `${import.meta.env.VITE_API_URL}/auth/google`,
+        github: `${import.meta.env.VITE_API_URL}/api/github/auth/url`,
       };
-      const token = btoa(JSON.stringify({ userId: mockUser.id, email: mockUser.email, provider }));
-      setAuth(mockUser, token);
-      toast.success(`Successfully connected with ${provider.charAt(0).toUpperCase() + provider.slice(1)}`);
-      navigate('/');
+      
+      window.location.href = oauthUrls[provider as keyof typeof oauthUrls];
     } catch (error) {
       toast.error(`Failed to connect with ${provider}`);
-    } finally {
-      setIsSocialLoading(null);
+      setIsSocialLoading(provider);
     }
   };
 

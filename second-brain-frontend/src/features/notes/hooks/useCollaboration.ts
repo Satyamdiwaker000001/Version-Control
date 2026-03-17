@@ -9,6 +9,17 @@ interface User {
   cursor?: { row: number; col: number };
   isOnline: boolean;
 }
+}
+
+interface CollaborationState {
+  isConnected: boolean;
+  isLiveMode: boolean;
+  connectedUsers: User[];
+  currentUser: User;
+  messages: LiveMessage[];
+  isTyping: boolean;
+  typingUsers: User[];
+}
 
 interface LiveMessage {
   id: string;
@@ -16,100 +27,27 @@ interface LiveMessage {
   userName: string;
   content: string;
   timestamp: string;
-  type: 'chat' | 'edit' | 'join' | 'leave';
-}
-
-interface CollaborationState {
-  isLiveMode: boolean;
-  connectionStatus: 'connected' | 'connecting' | 'disconnected';
-  onlineUsers: User[];
-  messages: LiveMessage[];
-  currentUser: User;
+  type: 'join' | 'leave' | 'chat' | 'edit';
 }
 
 interface UseCollaborationProps {
+  noteId: string;
   userId: string;
   userName: string;
 }
 
-// Mock WebSocket implementation - replace with real WebSocket in production
-
-export const useCollaboration = ({ userId, userName }: UseCollaborationProps) => {
+export const useCollaboration = ({ noteId, userId, userName }: UseCollaborationProps) => {
   const [state, setState] = useState<CollaborationState>({
+    isConnected: false,
     isLiveMode: false,
-    connectionStatus: 'disconnected',
-    onlineUsers: [],
+    connectedUsers: [],
+    currentUser: { id: userId, name: userName, color: '#6366f1' },
     messages: [],
-    currentUser: {
-      id: userId,
-      name: userName,
-      avatar: '',
-      color: '#' + Math.floor(Math.random()*16777215).toString(16),
-      isOnline: true
-    }
+    isTyping: false,
+    typingUsers: [],
   });
 
   const wsRef = useRef<any>(null);
-
-  // Simulate other users joining/leaving
-  const simulateUserActivity = useCallback(() => {
-    if (!state.isLiveMode) return;
-
-    const mockUsers: User[] = [
-      { id: 'user2', name: 'Alice', avatar: '', color: '#ff6b6b', isOnline: true },
-      { id: 'user3', name: 'Bob', avatar: '', color: '#4ecdc4', isOnline: true },
-      { id: 'user4', name: 'Carol', avatar: '', color: '#45b7d1', isOnline: false },
-    ];
-
-    // Randomly add/remove users
-    const activeUsers = mockUsers.filter(() => Math.random() > 0.3);
-    
-    setState(prev => ({
-      ...prev,
-      onlineUsers: activeUsers
-    }));
-
-    // Add join/leave messages
-    if (Math.random() > 0.7) {
-      const user = activeUsers[Math.floor(Math.random() * activeUsers.length)];
-      if (user) {
-        const message: LiveMessage = {
-          id: Date.now().toString(),
-          userId: user.id,
-          userName: user.name,
-          content: '',
-          timestamp: new Date().toISOString(),
-          type: Math.random() > 0.5 ? 'join' : 'leave'
-        };
-        
-        setState(prev => ({
-          ...prev,
-          messages: [...prev.messages, message].slice(-50) // Keep last 50 messages
-        }));
-      }
-    }
-  }, [state.isLiveMode]);
-
-  // Initialize WebSocket connection
-  const connect = useCallback(() => {
-    setState(prev => ({ ...prev, connectionStatus: 'connecting' }));
-
-    // Simulate connection delay
-    setTimeout(() => {
-      setState(prev => ({ 
-        ...prev, 
-        connectionStatus: 'connected' 
-      }));
-      
-      toast.success('Connected to collaboration session');
-      
-      // Start simulating user activity
-      const activityInterval = setInterval(simulateUserActivity, 5000);
-      
-      // Store interval for cleanup
-      (window as any).collaborationInterval = activityInterval;
-    }, 1000);
-  }, [simulateUserActivity]);
 
   // Disconnect from collaboration
   const disconnect = useCallback(() => {

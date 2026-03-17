@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GitHub OAuth Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .button { background: #0366d6; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+        .error { color: red; margin: 10px 0; }
+        .success { color: green; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>GitHub OAuth Connection Test</h1>
+    <p>This page will help test the GitHub OAuth connection step by step.</p>
+    
+    <button onclick="testGitHubAuth()" class="button">Test GitHub Auth URL</button>
+    <div id="result"></div>
+
+    <script>
+        async function testGitHubAuth() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>Testing GitHub OAuth URL...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:3001/api/github/auth/url');
+                const data = await response.json();
+                
+                if (data.success && data.data?.authUrl) {
+                    resultDiv.innerHTML = `
+                        <div class="success">✅ Successfully got GitHub OAuth URL</div>
+                        <p><strong>Auth URL:</strong> ${data.data.authUrl}</p>
+                        <button onclick="window.location.href='${data.data.authUrl}'" class="button">Connect to GitHub</button>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ Failed to get auth URL: ${data.message}</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Network error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
